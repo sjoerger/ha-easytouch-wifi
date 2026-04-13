@@ -1,4 +1,5 @@
 {
   "name": "Micro-Air EasyTouch Wi-Fi",
-  "render_readme": true
+  "render_readme": true,
+  "homeassistant": "2025.1.0"
 }
