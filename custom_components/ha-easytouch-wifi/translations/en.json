@@ -1,0 +1,69 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Sign in to Micro-Air EasyTouch cloud",
+        "description": "Enter your Micro-Air app credentials. A new AWS IoT certificate will be provisioned for this Home Assistant instance.",
+        "data": {
+          "username": "Username (email)",
+          "password": "Password"
+        }
+      },
+      "provision": {
+        "title": "Provisioning certificate…",
+        "description": "Authenticating with Micro-Air cloud and generating a device certificate. This may take a few seconds."
+      },
+      "serial": {
+        "title": "Add thermostat",
+        "description": "Enter the serial number printed on your EasyTouch thermostat. You are signed in as **{username}**.\n\nTo add additional thermostats, run this setup again after finishing.",
+        "data": {
+          "serial": "Device serial number"
+        }
+      }
+    },
+    "error": {
+      "provision_failed": "Cloud authentication or certificate provisioning failed. Check your credentials and try again.",
+      "serial_empty": "Serial number cannot be empty."
+    },
+    "abort": {
+      "already_configured": "This thermostat serial number is already configured."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "cloud_connected": {
+        "name": "Cloud Connected"
+      },
+      "data_healthy": {
+        "name": "Data Healthy"
+      }
+    },
+    "button": {
+      "reboot": {
+        "name": "Reboot"
+      }
+    },
+    "climate": {
+      "zone": {
+        "name": "Climate"
+      }
+    },
+    "sensor": {
+      "serial_number": {
+        "name": "Serial Number"
+      },
+      "firmware_version": {
+        "name": "Firmware Version"
+      },
+      "model_number": {
+        "name": "Model Number"
+      },
+      "device_type": {
+        "name": "Device Type"
+      },
+      "mqtt_endpoint": {
+        "name": "MQTT Endpoint"
+      }
+    }
+  }
+}

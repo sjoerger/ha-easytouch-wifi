@@ -1,0 +1,17 @@
+{
+  "domain": "ha_easytouch_wifi",
+  "name": "Micro-Air EasyTouch Wi-Fi",
+  "version": "1.0.0",
+  "config_flow": true,
+  "documentation": "https://github.com/phurth/ha-easytouch",
+  "issue_tracker": "https://github.com/phurth/ha-easytouch/issues",
+  "integration_type": "device",
+  "iot_class": "cloud_polling",
+  "requirements": [
+    "paho-mqtt>=2.0.0",
+    "pycognito>=2023.5.1",
+    "boto3>=1.26.0"
+  ],
+  "codeowners": [],
+  "homeassistant": "2024.1.0"
+}
