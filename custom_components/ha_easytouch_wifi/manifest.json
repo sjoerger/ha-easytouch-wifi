@@ -3,8 +3,8 @@
   "name": "Micro-Air EasyTouch Wi-Fi",
   "version": "1.0.0",
   "config_flow": true,
-  "documentation": "https://github.com/phurth/ha-easytouch",
-  "issue_tracker": "https://github.com/phurth/ha-easytouch/issues",
+  "documentation": "https://github.com/sjoerger/ha-easytouch-wifi",
+  "issue_tracker": "https://github.com/sjoerger/ha-easytouch-wifi/issues",
   "integration_type": "device",
   "iot_class": "cloud_polling",
   "requirements": [
