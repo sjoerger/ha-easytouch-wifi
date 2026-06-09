@@ -47,6 +47,9 @@
     "button": {
       "reboot": {
         "name": "Reboot"
+      },
+      "bluetooth_reboot": {
+        "name": "Bluetooth Reboot"
       }
     },
     "climate": {
