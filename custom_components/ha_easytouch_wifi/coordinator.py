@@ -420,7 +420,8 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
 
         _LOGGER.info("EasyTouch %s connected to MQTT broker", self._serial)
         client.subscribe(self._topic)
-        _LOGGER.debug("Subscribed to %s", self._topic)
+        client.subscribe(self._topic + "/#")
+        _LOGGER.debug("Subscribed to %s and %s/#", self._topic, self._topic)
 
         # Request zone configs (only on first connect; skip if already done)
         if not self._config_done:
@@ -438,7 +439,7 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         except Exception as exc:
             _LOGGER.warning("Failed to parse MQTT message: %s", exc)
             return
-        self._loop.call_soon_threadsafe(self._handle_json, obj)
+        self._loop.call_soon_threadsafe(self._handle_json, msg.topic, obj)
 
     def _on_disconnect_cb(self, client, userdata, disconnect_flags, reason_code, properties=None) -> None:
         _LOGGER.debug(
@@ -533,7 +534,7 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
     # ──────────────────────────────────────────────────────────────────────────
 
     @callback
-    def _handle_json(self, obj: dict) -> None:
+    def _handle_json(self, topic: str, obj: dict) -> None:
         rtype = obj.get("Type", "")
         rt = obj.get("RT", "")
 
@@ -544,13 +545,11 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         elif rt == "OK":
             _LOGGER.info("Device acknowledged command")
         elif "Change" in rtype:
-            # Echoed outbound Change request — ignore.
-            pass
-        elif rtype in ("Get Status", "Get Config", "Get Schedule"):
-            # Own published requests echoed back by the broker — ignore.
+            _LOGGER.debug("Change message topic=%s payload=%s", topic, obj)
+        elif rtype in ("Get Status", "Get Config", "Get Schedule", "ExtraData"):
             pass
         else:
-            _LOGGER.debug("Unhandled message Type=%r RT=%r", rtype, rt)
+            _LOGGER.debug("Unhandled message topic=%s Type=%r RT=%r payload=%s", topic, rtype, rt, obj)
 
     # ──────────────────────────────────────────────────────────────────────────
     # Config parsing
