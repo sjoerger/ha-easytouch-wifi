@@ -96,39 +96,26 @@ def _fan_field_for_mode(mode_num: int) -> str:
     return FAN_FIELD_COOL
 
 
-def _build_ssl_context(ca_pem: str, client_cert: str, client_key: str) -> ssl.SSLContext:
-    """Build an SSL context from PEM strings.
+def _build_ssl_context(client_cert: str, client_key: str) -> ssl.SSLContext:
+    """Build a mutual-TLS SSL context using the system CA bundle.
 
-    The CA cert is loaded directly from string.  Client cert/key are written to
-    temporary files (ssl module requires file paths for load_cert_chain) and
-    deleted immediately after loading.
+    The system CA bundle (which includes Amazon Root CA 1) is used for server
+    verification. Client cert/key are written to temporary files and deleted
+    immediately after loading.
     """
-    _LOGGER.debug(
-        "Building SSL context: ca_pem type=%s len=%d first50=%r",
-        type(ca_pem).__name__,
-        len(ca_pem) if ca_pem else 0,
-        (ca_pem or "")[:50],
-    )
+    ctx = ssl.create_default_context()
 
-    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    ctx.check_hostname = True
-    ctx.verify_mode = ssl.CERT_REQUIRED
-
-    tmp_ca = tmp_cert = tmp_key = None
+    tmp_cert = tmp_key = None
     try:
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as f:
-            f.write(ca_pem)
-            tmp_ca = f.name
         with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as f:
             f.write(client_cert)
             tmp_cert = f.name
         with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as f:
             f.write(client_key)
             tmp_key = f.name
-        ctx.load_verify_locations(cafile=tmp_ca)
         ctx.load_cert_chain(tmp_cert, tmp_key)
     finally:
-        for p in (tmp_ca, tmp_cert, tmp_key):
+        for p in (tmp_cert, tmp_key):
             if p and os.path.exists(p):
                 os.unlink(p)
 
@@ -411,7 +398,7 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
             max_delay=RECONNECT_BACKOFF_CAP_S,
         )
 
-        ssl_ctx = _build_ssl_context(self._ca_pem, self._client_cert, self._client_key)
+        ssl_ctx = _build_ssl_context(self._client_cert, self._client_key)
         self._mqtt.tls_set_context(ssl_ctx)
 
     def _connect_sync(self) -> None:
