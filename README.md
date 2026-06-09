@@ -12,8 +12,9 @@ This integration was built as a more reliable alternative to the existing BLE-ba
 - **Multi-zone support** — zones discovered dynamically; each gets its own climate entity
 - **Heat source presets** — select from Heat Pump, Furnace, Heat Strip, Electric Heat, Gas Heat (based on what your unit supports)
 - **Auto mode** — independent heating/cooling setpoints
-- **Fan control** — Auto, Low, High (mode-dependent)
+- **Fan control** — Auto, Low, Medium, High (mode-dependent)
 - **Optimistic updates** — UI responds immediately; no waiting for the device to echo back state
+- **Weather location** — sends your HA home coordinates to the thermostat on connect and hourly so the device displays accurate local weather
 - **Diagnostic sensors** — serial number, firmware version, model, device type, MQTT endpoint
 - **Cloud connectivity sensor** — know when the device loses its AWS connection
 - **Reboot button** — send a reboot command to the thermostat
@@ -40,7 +41,7 @@ This integration was built as a more reliable alternative to the existing BLE-ba
 
 ### Manual
 
-1. Copy the `custom_components/ha-easytouch-wifi` directory into your Home Assistant `custom_components` folder.
+1. Copy the `custom_components/ha_easytouch_wifi` directory into your Home Assistant `custom_components` folder.
 2. Restart Home Assistant.
 
 ---
@@ -78,19 +79,21 @@ To add a second thermostat under the same account, repeat the process with the o
 
 The thermostat connects to AWS IoT Core over MQTT (port 8883, mutual TLS). During setup, this integration authenticates with Micro-Air's Cognito user pool using the SRP auth flow and provisions a new IoT certificate under your account — the same mechanism used by the Android app.
 
-The coordinator connects directly to the same AWS IoT endpoint, subscribing to the device's MQTT topic (`EasyTouch <serial>`). Status is polled every 10 seconds via a `Get Status` command; zone configuration is requested on connect.
+The coordinator connects directly to the same AWS IoT endpoint, subscribing to the device's MQTT topic (`EasyTouch <serial>`) and any subtopics. Status is polled every 10 seconds via a `Get Status` command; zone configuration is requested on connect. Location coordinates (from HA's home location) and a Unix timestamp are included in the first poll and approximately once per hour so the thermostat can display accurate local weather.
 
-The provisioned certificate is stored encrypted in your Home Assistant config entry. AWS IoT certificates do not expire and remain valid until explicitly revoked.
+The provisioned certificate is stored encrypted in your Home Assistant config entry. AWS IoT certificates do not expire and remain valid until explicitly revoked. Server certificate verification uses the system CA bundle, which includes all Amazon Trust Services root CAs.
 
 ---
 
 ## Technical Notes
 
 - Uses `paho-mqtt` 2.x directly (not HA's built-in MQTT component) — required for mutual TLS with AWS IoT certificates
+- SSL context uses `ssl.create_default_context()` with the system CA bundle; the provisioned client cert/key are loaded via temporary files
 - The MQTT network loop runs in a background thread; callbacks bridge to the HA event loop via `call_soon_threadsafe`
 - 500ms debounce on temperature and fan changes prevents command flooding during slider adjustments
 - 5-second status suppression after sending a command prevents the UI from bouncing back before the device applies the change
 - paho's built-in reconnect handles transient drops; zone subscriptions are re-established on reconnect
+- Location format (5 decimal places, DST in minutes) validated against Android app source (`U_Thermostat.java`)
 
 ---
 
