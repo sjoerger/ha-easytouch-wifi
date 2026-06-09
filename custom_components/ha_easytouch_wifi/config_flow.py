@@ -181,10 +181,8 @@ class EasyTouchWiFiConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Run AWS provisioning and wait for it to complete."""
         if self._provision_task is None:
-            self._provision_task = self.hass.async_create_task(
-                self.hass.async_add_executor_job(
-                    _provision_sync, self._username, self._password_temp
-                )
+            self._provision_task = self.hass.async_add_executor_job(
+                _provision_sync, self._username, self._password_temp
             )
 
         if not self._provision_task.done():
