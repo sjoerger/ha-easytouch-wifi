@@ -474,16 +474,21 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
     # ──────────────────────────────────────────────────────────────────────────
 
     def _build_status_request(self) -> dict:
-        """Build a Get Status payload including HA home lat/lon and DST offset."""
-        msg: dict = {"Type": "Get Status", "Zone": 0}
+        """Build a Get Status payload including location, DST, and timestamp.
+
+        Format matches the Android app (sendStatusRequest): LAT/LON as 5-decimal
+        strings, DST as integer minutes, TM as Unix timestamp.
+        """
+        now_utc = datetime.now(ZoneInfo("UTC"))
+        msg: dict = {"Type": "Get Status", "Zone": 0, "TM": int(now_utc.timestamp())}
         lat = self.hass.config.latitude
         lon = self.hass.config.longitude
         if lat is not None and lon is not None:
             tz = ZoneInfo(self.hass.config.time_zone)
             dst = datetime.now(tz).dst()
             dst_minutes = int(dst.total_seconds() / 60) if dst else 0
-            msg["LAT"] = f"{lat:.8f}"
-            msg["LON"] = f"{lon:.8f}"
+            msg["LAT"] = f"{lat:.5f}"
+            msg["LON"] = f"{lon:.5f}"
             msg["DST"] = dst_minutes
         return msg
 
