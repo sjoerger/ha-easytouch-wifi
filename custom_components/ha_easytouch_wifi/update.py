@@ -213,7 +213,7 @@ class EasyTouchFirmwareUpdate(CoordinatorEntity[EasyTouchMQTTCoordinator], Updat
             self._serial,
             self.installed_version,
             self._latest_version,
-            self.update_available,
+            _is_newer(self._latest_version or "", self.installed_version or ""),
         )
         self.async_write_ha_state()
 
