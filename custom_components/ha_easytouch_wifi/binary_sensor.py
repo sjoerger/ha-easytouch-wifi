@@ -23,6 +23,7 @@ from .coordinator import EasyTouchMQTTCoordinator
 @dataclass(frozen=True, kw_only=True)
 class EasyTouchBinarySensorDescription(BinarySensorEntityDescription):
     value_fn: callable = lambda coordinator: False
+    available_fn: callable = lambda coordinator: True
 
 
 BINARY_SENSOR_DESCRIPTIONS: tuple[EasyTouchBinarySensorDescription, ...] = (
@@ -49,6 +50,7 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[EasyTouchBinarySensorDescription, ...] = (
         entity_registry_enabled_default=True,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda c: c.data is not None and c.data.device_wifi_connected,
+        available_fn=lambda c: c.data_healthy,  # stale data = can't trust device-reported status
     ),
     EasyTouchBinarySensorDescription(
         key="device_aws_connected",
@@ -57,6 +59,7 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[EasyTouchBinarySensorDescription, ...] = (
         entity_registry_enabled_default=True,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda c: c.data is not None and c.data.device_aws_connected,
+        available_fn=lambda c: c.data_healthy,  # stale data = can't trust device-reported status
     ),
 )
 
@@ -96,6 +99,10 @@ class EasyTouchBinarySensor(
             serial_number=serial,
         )
         self._description = description
+
+    @property
+    def available(self) -> bool:
+        return self._description.available_fn(self.coordinator)
 
     @property
     def is_on(self) -> bool | None:
