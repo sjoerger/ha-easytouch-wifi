@@ -324,7 +324,7 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
     def _send_change(self, changes: dict) -> None:
         """Publish a Change command immediately (thread-safe)."""
         payload = json.dumps({"Type": "Change", "Changes": changes}, separators=(",", ":"))
-        _LOGGER.debug("Publishing command: %.120s", payload)
+        _LOGGER.info("Publishing command: %.120s", payload)
         self._publish(payload)
 
     def _publish(self, payload: str) -> None:
@@ -541,8 +541,10 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
             self._parse_config(obj)
         elif (rtype == "Response" and rt == "Status") or rtype == "Status":
             self._parse_status(obj)
-        elif "Change" in rtype or rt == "OK":
-            # Echoed outbound Change or device ACK — nothing to do.
+        elif rt == "OK":
+            _LOGGER.info("Device acknowledged command")
+        elif "Change" in rtype:
+            # Echoed outbound Change request — ignore.
             pass
         elif rtype in ("Get Status", "Get Config", "Get Schedule"):
             # Own published requests echoed back by the broker — ignore.
