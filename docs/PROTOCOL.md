@@ -213,8 +213,35 @@ All commands are published to `EasyTouch <serial>`.
 
 ### Get Status
 ```json
-{"Type": "Get Status", "Zone": 0}
+{"Type": "Get Status", "Zone": 0, "TM": 1749479400, "LAT": "38.97916", "LON": "-74.89763", "DST": 60}
 ```
+
+| Field | Type | Description |
+|---|---|---|
+| `Zone` | int | Zone index (0-based) |
+| `TM` | int | Unix timestamp (seconds UTC) — sent every poll for device clock sync |
+| `LAT` | string | Latitude, 5 decimal places — used by device to fetch local weather |
+| `LON` | string | Longitude, 5 decimal places |
+| `DST` | int | Current DST offset in minutes (60 when DST active, 0 otherwise) |
+
+`TM` is included on every poll. `LAT`/`LON`/`DST` are sent on first connect and approximately once per hour. The Android app only sends location over Bluetooth; the iOS app sends it over MQTT as well. Format confirmed from `U_Thermostat.java` (`sendStatusRequest()`).
+
+### ExtraData
+```json
+{"Type": "ExtraData", "Zone": 0}
+```
+
+Sent by the iOS app to request supplemental device metadata. Response:
+```json
+{"Type": "Response", "RT": "ExtraData", "TT": "EasyTouch", "SN": "352016364", "REV": "1.0.7.0", "Zone": 0, "SS": 27, "OS": 0, "AO": 3}
+```
+
+| Field | Description |
+|---|---|
+| `TT` | Device type string |
+| `SN` | Serial number |
+| `REV` | Firmware version |
+| `SS` / `OS` / `AO` | Unknown — observed values: 27, 0, 3 |
 
 ### Get Config
 ```json
