@@ -103,25 +103,34 @@ def _build_ssl_context(ca_pem: str, client_cert: str, client_key: str) -> ssl.SS
     temporary files (ssl module requires file paths for load_cert_chain) and
     deleted immediately after loading.
     """
+    _LOGGER.debug(
+        "Building SSL context: ca_pem type=%s len=%d first50=%r",
+        type(ca_pem).__name__,
+        len(ca_pem) if ca_pem else 0,
+        (ca_pem or "")[:50],
+    )
+
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     ctx.check_hostname = True
     ctx.verify_mode = ssl.CERT_REQUIRED
-    ctx.load_verify_locations(cadata=ca_pem)
 
-    tmp_cert = tmp_key = None
+    tmp_ca = tmp_cert = tmp_key = None
     try:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as f:
+            f.write(ca_pem)
+            tmp_ca = f.name
         with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as f:
             f.write(client_cert)
             tmp_cert = f.name
         with tempfile.NamedTemporaryFile(mode="w", suffix=".pem", delete=False) as f:
             f.write(client_key)
             tmp_key = f.name
+        ctx.load_verify_locations(cafile=tmp_ca)
         ctx.load_cert_chain(tmp_cert, tmp_key)
     finally:
-        if tmp_cert and os.path.exists(tmp_cert):
-            os.unlink(tmp_cert)
-        if tmp_key and os.path.exists(tmp_key):
-            os.unlink(tmp_key)
+        for p in (tmp_ca, tmp_cert, tmp_key):
+            if p and os.path.exists(p):
+                os.unlink(p)
 
     return ctx
 
