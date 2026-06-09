@@ -541,8 +541,12 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
             self._parse_config(obj)
         elif (rtype == "Response" and rt == "Status") or rtype == "Status":
             self._parse_status(obj)
-        elif "Change" in rtype:
-            _LOGGER.debug("Change result: %s", obj.get("Success"))
+        elif "Change" in rtype or rt == "OK":
+            # Echoed outbound Change or device ACK — nothing to do.
+            pass
+        elif rtype in ("Get Status", "Get Config", "Get Schedule"):
+            # Own published requests echoed back by the broker — ignore.
+            pass
         else:
             _LOGGER.debug("Unhandled message Type=%r RT=%r", rtype, rt)
 
