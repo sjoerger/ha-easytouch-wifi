@@ -224,6 +224,7 @@ class EasyTouchWiFiConfigFlow(ConfigFlow, domain=DOMAIN):
                     title=f"EasyTouch {serial}",
                     data={
                         CONF_USERNAME: self._username,
+                        CONF_PASSWORD: self._password_temp,
                         CONF_SERIAL: serial,
                         CONF_CA_PEM: result["ca_pem"],
                         CONF_CLIENT_CERT: result["client_cert"],

@@ -18,6 +18,7 @@ PLATFORMS: list[str] = [
     "climate",
     "number",
     "sensor",
+    "update",
 ]
 
 

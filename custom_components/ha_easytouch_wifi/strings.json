@@ -48,6 +48,11 @@
         "name": "Climate"
       }
     },
+    "update": {
+      "firmware_update": {
+        "name": "Firmware"
+      }
+    },
     "number": {
       "alert_low_temp": {
         "name": "Low Temperature Alert"

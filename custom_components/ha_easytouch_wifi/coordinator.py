@@ -253,7 +253,7 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
                 if first_mode is not None:
                     mode_num = first_mode
         power = 0 if ha_mode == "off" else 1
-        self._send_change({"zone": zone, "power": power, "mode": mode_num})
+        self.send_change({"zone": zone, "power": power, "mode": mode_num})
         self.suppress_status()
 
     async def async_set_preset_mode(self, zone: int, preset: str) -> None:
@@ -261,7 +261,7 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         if mode_num is None:
             _LOGGER.warning("Unknown preset: %s", preset)
             return
-        self._send_change({"zone": zone, "power": 1, "mode": mode_num})
+        self.send_change({"zone": zone, "power": 1, "mode": mode_num})
         self.suppress_status()
 
     async def async_set_temperature(
@@ -271,15 +271,15 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         field = {"cool": "cool_sp", "heat": "heat_sp", "dry": "dry_sp"}.get(ha_mode)
         if field is None:
             return
-        self._send_change({"zone": zone, field: int(temp)})
+        self.send_change({"zone": zone, field: int(temp)})
         self.suppress_status()
 
     async def async_set_temperature_high(self, zone: int, temp: float) -> None:
-        self._send_change({"zone": zone, "autoCool_sp": int(temp)})
+        self.send_change({"zone": zone, "autoCool_sp": int(temp)})
         self.suppress_status()
 
     async def async_set_temperature_low(self, zone: int, temp: float) -> None:
-        self._send_change({"zone": zone, "autoHeat_sp": int(temp)})
+        self.send_change({"zone": zone, "autoHeat_sp": int(temp)})
         self.suppress_status()
 
     async def async_set_fan_mode(self, zone: int, ha_fan: str, mode_num: int) -> None:
@@ -294,11 +294,11 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         field = field_map.get(ha_mode)
         if field is None:
             return
-        self._send_change({"zone": zone, field: fan_value})
+        self.send_change({"zone": zone, field: fan_value})
         self.suppress_status()
 
     async def async_reboot(self) -> None:
-        self._send_change({"zone": 0, "reset": "OK"})
+        self.send_change({"zone": 0, "reset": "OK"})
         self.suppress_status(10.0)
 
     def schedule_debounce(
@@ -323,10 +323,16 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
             self.hass, _run(), f"easytouch_wifi_debounce_{key}"
         )
 
-    def _send_change(self, changes: dict) -> None:
+    def send_change(self, changes: dict) -> None:
         """Publish a Change command immediately (thread-safe)."""
         payload = json.dumps({"Type": "Change", "Changes": changes}, separators=(",", ":"))
         _LOGGER.info("Publishing command: %.120s", payload)
+        self._publish(payload)
+
+    def publish_json(self, obj: dict) -> None:
+        """Publish an arbitrary JSON object to the device topic (thread-safe)."""
+        payload = json.dumps(obj, separators=(",", ":"))
+        _LOGGER.info("Publishing command: %.200s", payload)
         self._publish(payload)
 
     def _publish(self, payload: str) -> None:

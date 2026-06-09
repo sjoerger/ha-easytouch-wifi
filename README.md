@@ -14,6 +14,7 @@ This integration was built as a more reliable alternative to the existing BLE-ba
 - **Auto mode** — independent heating/cooling setpoints
 - **Fan control** — Auto, Low, Medium, High (mode-dependent)
 - **Optimistic updates** — UI responds immediately; no waiting for the device to echo back state
+- **Firmware updates** — checks for available firmware daily via AWS and installs with one click; device downloads and reboots autonomously
 - **Temperature alerts** — configure low and high temperature alert thresholds (40–110°F) that trigger push notifications from the Micro-Air app
 - **Weather location** — sends your HA home coordinates to the thermostat on connect and hourly so the device displays accurate local weather
 - **Diagnostic sensors** — serial number, firmware version, model, device type, MQTT endpoint
@@ -72,6 +73,7 @@ To add a second thermostat under the same account, repeat the process with the o
 | Model Number | `sensor` | Model string from device config (diagnostic) |
 | Device Type | `sensor` | Device type from config (diagnostic) |
 | MQTT Endpoint | `sensor` | AWS IoT hostname in use (diagnostic) |
+| Firmware | `update` | Shows installed vs latest firmware; install button sends update command to device |
 | Low Temperature Alert | `number` | Alert threshold lower bound (40–108°F); triggers app push notification |
 | High Temperature Alert | `number` | Alert threshold upper bound (42–110°F); triggers app push notification |
 | Reboot | `button` | Send a reboot command to the thermostat |
