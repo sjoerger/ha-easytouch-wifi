@@ -345,7 +345,12 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
     async def async_start(self) -> None:
         """Set up MQTT client and begin polling. Called once at entry setup."""
         self._loop = self.hass.loop
-        self._setup_mqtt_client()
+
+        try:
+            await self.hass.async_add_executor_job(self._setup_mqtt_client)
+        except Exception as exc:
+            _LOGGER.error("Failed to build SSL context: %s", exc)
+            return
 
         try:
             await self.hass.async_add_executor_job(self._connect_sync)
