@@ -473,23 +473,26 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
     # Poll loop
     # ──────────────────────────────────────────────────────────────────────────
 
-    def _build_status_request(self) -> dict:
-        """Build a Get Status payload including location, DST, and timestamp.
+    def _build_status_request(self, include_location: bool = False) -> dict:
+        """Build a Get Status payload.
 
-        Format matches the Android app (sendStatusRequest): LAT/LON as 5-decimal
-        strings, DST as integer minutes, TM as Unix timestamp.
+        TM (Unix timestamp) is always included. LAT/LON/DST are included only
+        when include_location=True — on first connect and once per hour — so
+        the device gets fresh weather coordinates without redundant data every poll.
+        Format matches Android app (sendStatusRequest): LAT/LON as 5-decimal strings.
         """
         now_utc = datetime.now(ZoneInfo("UTC"))
         msg: dict = {"Type": "Get Status", "Zone": 0, "TM": int(now_utc.timestamp())}
-        lat = self.hass.config.latitude
-        lon = self.hass.config.longitude
-        if lat is not None and lon is not None:
-            tz = ZoneInfo(self.hass.config.time_zone)
-            dst = datetime.now(tz).dst()
-            dst_minutes = int(dst.total_seconds() / 60) if dst else 0
-            msg["LAT"] = f"{lat:.5f}"
-            msg["LON"] = f"{lon:.5f}"
-            msg["DST"] = dst_minutes
+        if include_location:
+            lat = self.hass.config.latitude
+            lon = self.hass.config.longitude
+            if lat is not None and lon is not None:
+                tz = ZoneInfo(self.hass.config.time_zone)
+                dst = datetime.now(tz).dst()
+                dst_minutes = int(dst.total_seconds() / 60) if dst else 0
+                msg["LAT"] = f"{lat:.5f}"
+                msg["LON"] = f"{lon:.5f}"
+                msg["DST"] = dst_minutes
         return msg
 
     async def _poll_loop(self) -> None:
@@ -506,6 +509,10 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         # Give config responses a moment to arrive before first status poll
         await asyncio.sleep(CONFIG_REQUEST_DELAY_S * 4)
 
+        # Send location on first poll, then every hour (3600s / 10s interval = 360 polls).
+        location_interval = max(1, round(3600 / MQTT_POLL_INTERVAL_S))
+        poll_count = 0
+
         while True:
             try:
                 await asyncio.sleep(MQTT_POLL_INTERVAL_S)
@@ -513,7 +520,9 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
                 return
 
             if self._connected:
-                self._publish(json.dumps(self._build_status_request()))
+                include_loc = (poll_count % location_interval) == 0
+                self._publish(json.dumps(self._build_status_request(include_loc)))
+                poll_count += 1
 
     # ──────────────────────────────────────────────────────────────────────────
     # Reconnect (for initial connect failure — paho handles subsequent reconnects)
