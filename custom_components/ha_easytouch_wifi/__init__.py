@@ -16,6 +16,7 @@ PLATFORMS: list[str] = [
     "binary_sensor",
     "button",
     "climate",
+    "number",
     "sensor",
 ]
 

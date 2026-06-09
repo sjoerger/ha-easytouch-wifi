@@ -293,6 +293,21 @@ Power off is achieved by setting mode to `0` (off). The last active mode is stor
 {"Type": "Change", "Changes": {"zone": 0, "fan": "fan_high"}}
 ```
 
+### Temperature Alert Thresholds
+```json
+{"Type": "Change", "Changes": {"zone": 0, "alertLL": 40}}
+{"Type": "Change", "Changes": {"zone": 0, "alertUL": 90}}
+```
+
+Fields are sent individually, not together. Constraints (enforced by Android app, `Notifications.java`):
+
+| Field | Min | Max | Rule |
+|---|---|---|---|
+| `alertLL` | 40°F | 108°F | Must be ≤ `alertUL` − 2 |
+| `alertUL` | 42°F | 110°F | Must be ≥ `alertLL` + 2 |
+
+The current values are reported in every status response as `alertLL` / `alertUL` top-level fields.
+
 ### Calibration / Reset
 ```json
 {"Type": "Change", "Changes": {"zone": 0, "cal": "OK"}}

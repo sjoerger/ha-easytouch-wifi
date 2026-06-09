@@ -660,6 +660,8 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
 
         prm = obj.get("PRM", [])
         system_power = bool(prm[1] & PRM_FLAG_SYSTEM_POWER) if len(prm) > 1 else True
+        alert_low = int(obj.get("alertLL", 40))
+        alert_high = int(obj.get("alertUL", 110))
 
         zones: dict[int, ZoneState] = {}
         for key, arr in z_sts.items():
@@ -710,6 +712,8 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
             device_type=self.device_type,
             config_index=self.config_index,
             model_number=self.device_model,
+            alert_low=alert_low,
+            alert_high=alert_high,
         )
         self.async_set_updated_data(self.thermostat_state)
 

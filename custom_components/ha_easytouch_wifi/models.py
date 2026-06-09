@@ -55,6 +55,9 @@ class ThermostatState:
     config_index: str | None = None
     model_number: str | None = None
 
+    alert_low: int = 40    # alertLL — low temperature alert threshold (°F)
+    alert_high: int = 110  # alertUL — high temperature alert threshold (°F)
+
     @property
     def primary_zone(self) -> ZoneState | None:
         return self.zones.get(0)

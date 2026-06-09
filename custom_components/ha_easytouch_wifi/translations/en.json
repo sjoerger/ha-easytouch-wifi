@@ -48,6 +48,14 @@
         "name": "Climate"
       }
     },
+    "number": {
+      "alert_low_temp": {
+        "name": "Low Temperature Alert"
+      },
+      "alert_high_temp": {
+        "name": "High Temperature Alert"
+      }
+    },
     "sensor": {
       "serial_number": {
         "name": "Serial Number"
