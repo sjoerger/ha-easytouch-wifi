@@ -100,5 +100,9 @@ class EasyTouchSensor(CoordinatorEntity[EasyTouchMQTTCoordinator], SensorEntity)
         self._description = description
 
     @property
+    def available(self) -> bool:
+        return self.coordinator.connected
+
+    @property
     def native_value(self) -> Any:
         return self._description.value_fn(self.coordinator)

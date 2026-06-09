@@ -36,6 +36,12 @@
       },
       "data_healthy": {
         "name": "Data Healthy"
+      },
+      "device_wifi_connected": {
+        "name": "Thermostat Wi-Fi"
+      },
+      "device_aws_connected": {
+        "name": "Thermostat Cloud"
       }
     },
     "button": {

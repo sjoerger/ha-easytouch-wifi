@@ -74,7 +74,9 @@ from .const import (
     MQTT_POLL_INTERVAL_S,
     MQTT_PORT,
     MQTT_TOPIC_FORMAT,
+    PRM_FLAG_AWS_CONNECTED,
     PRM_FLAG_SYSTEM_POWER,
+    PRM_FLAG_WIFI_CONNECTED,
     FLAG_CYCLE_ACTIVE,
     FLAG_IS_COOLING,
     FLAG_IS_HEATING,
@@ -665,8 +667,11 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
             return
 
         prm = obj.get("PRM", [])
-        system_power = bool(prm[1] & PRM_FLAG_SYSTEM_POWER) if len(prm) > 1 else True
-        alert_low = int(obj.get("alertLL", 40))
+        prm_flags = int(prm[1]) if len(prm) > 1 else 0
+        system_power        = bool(prm_flags & PRM_FLAG_SYSTEM_POWER)
+        device_wifi         = bool(prm_flags & PRM_FLAG_WIFI_CONNECTED)
+        device_aws          = bool(prm_flags & PRM_FLAG_AWS_CONNECTED)
+        alert_low  = int(obj.get("alertLL", 40))
         alert_high = int(obj.get("alertUL", 110))
 
         zones: dict[int, ZoneState] = {}
@@ -720,6 +725,8 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
             model_number=self.device_model,
             alert_low=alert_low,
             alert_high=alert_high,
+            device_wifi_connected=device_wifi,
+            device_aws_connected=device_aws,
         )
         self.async_set_updated_data(self.thermostat_state)
 

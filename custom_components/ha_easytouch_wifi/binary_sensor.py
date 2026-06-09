@@ -42,6 +42,22 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[EasyTouchBinarySensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda c: not c.data_healthy,  # PROBLEM = True when data is stale
     ),
+    EasyTouchBinarySensorDescription(
+        key="device_wifi_connected",
+        translation_key="device_wifi_connected",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        entity_registry_enabled_default=True,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda c: c.data is not None and c.data.device_wifi_connected,
+    ),
+    EasyTouchBinarySensorDescription(
+        key="device_aws_connected",
+        translation_key="device_aws_connected",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        entity_registry_enabled_default=True,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda c: c.data is not None and c.data.device_aws_connected,
+    ),
 )
 
 

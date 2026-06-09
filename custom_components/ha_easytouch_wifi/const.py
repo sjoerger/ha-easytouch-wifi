@@ -150,7 +150,10 @@ FLAG_IS_COOLING = 0x02
 FLAG_IS_HEATING = 0x04
 
 # PRM[1] bitmask
-PRM_FLAG_SYSTEM_POWER = 0x08
+PRM_FLAG_WIFI_CONNECTED  = 0x01
+PRM_FLAG_AWS_CONNECTED   = 0x02
+PRM_FLAG_PUSH_NOTIFY     = 0x04
+PRM_FLAG_SYSTEM_POWER    = 0x08
 
 # ── Timing ────────────────────────────────────────────────────────────────────
 MQTT_POLL_INTERVAL_S = 10.0        # Status poll interval

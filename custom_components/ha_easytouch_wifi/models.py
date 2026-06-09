@@ -57,6 +57,8 @@ class ThermostatState:
 
     alert_low: int = 40    # alertLL — low temperature alert threshold (°F)
     alert_high: int = 110  # alertUL — high temperature alert threshold (°F)
+    device_wifi_connected: bool = False   # PRM[1] bit 0 — thermostat Wi-Fi status
+    device_aws_connected: bool = False    # PRM[1] bit 1 — thermostat AWS IoT status
 
     @property
     def primary_zone(self) -> ZoneState | None:
