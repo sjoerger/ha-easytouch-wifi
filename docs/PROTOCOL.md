@@ -362,24 +362,64 @@ Day: 0 = Sunday, 1 = Monday, ... 6 = Saturday.
 ```json
 {
   "Type": "Change",
-  "day": 0,
-  "data": [time, heatSP, coolSP, modeAndZones, fan,   time, heatSP, coolSP, modeAndZones, fan, ...]
+  "day": 1,
+  "data": [
+    [time, heatSP, coolSP, modeAndZones, fan],
+    [time, heatSP, coolSP, modeAndZones, fan]
+  ]
 }
 ```
 
-Each schedule event is 5 consecutive values in the `data` array:
+Note: `"data"` is an **array of 5-element arrays** (one per slot), not a flat array. Uses `"day"` / `"data"` at the top level, not the `"Changes"` wrapper used by other commands. Source: `Schedule_Main6.java`.
 
-| Position | Field | Description |
+#### Schedule slot fields
+
+| Index | Field | Description |
 |---|---|---|
-| 0 | `time` | Minutes since midnight (e.g. 480 = 8:00 AM). `128` = disabled |
+| 0 | `time` | Bit-packed time (see below). `128` (`0x80`) = slot disabled |
 | 1 | `heatSP` | Heat setpoint (°F) |
 | 2 | `coolSP` | Cool setpoint (°F) |
 | 3 | `modeAndZones` | Lower nibble = mode, upper nibble = selected zones bitmask |
-| 4 | `fan` | Fan speed |
+| 4 | `fan` | Fan speed (see below) |
 
-`modeAndZones` encoding: `mode | (selectedZones << 4)`
+#### `time` encoding (bit-packed byte)
 
-When parsing a schedule response, the mode is extracted as `value & 0x0F` and selected zones as `value >> 4`.
+| Bits | Field | Notes |
+|---|---|---|
+| 7 | Disabled | `1` = slot inactive, `0` = active |
+| 6–2 | Hour | 0–23, extracted as `(time >> 2) & 0x1F` |
+| 1–0 | Quarter | 0=:00, 1=:15, 2=:30, 3=:45 |
+
+Encoding: `time = (hour << 2) | quarter`. To disable a slot: `time |= 0x80`.
+
+Examples: `8` = 2:00 AM, `11` = 2:45 AM, `48` = 12:00 PM, `128` = disabled.
+
+#### `modeAndZones` encoding
+
+`modeAndZones = mode | (selectedZones << 4)`
+
+`selectedZones` is a bitmask where bit 0 = zone 1, bit 1 = zone 2, etc. To decode: `mode = value & 0x0F`, `zones = value >> 4`.
+
+#### `fan` encoding
+
+| Bit(s) | Meaning |
+|---|---|
+| 7 | Full auto (`128` = auto) |
+| 6 | Semi-auto |
+| 3–0 | Speed level (1–15); `0` = off |
+
+Use `128` for auto fan. Fixed speeds use the lower nibble.
+
+### Schedule response
+
+```json
+{"Type": "Response", "RT": "Schedule", "DAY": 1, "EVNT": {
+  "0": [time, heatSP, coolSP, modeAndZones, fan],
+  "1": [time, heatSP, coolSP, modeAndZones, fan]
+}}
+```
+
+`EVNT` is a dict keyed by slot index string (`"0"`, `"1"`, …). Same field encoding as the set command.
 
 ---
 
