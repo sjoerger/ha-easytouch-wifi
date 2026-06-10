@@ -153,14 +153,24 @@ class EasyTouchBLERebootButton(ButtonEntity):
         try:
             client = await establish_connection(BleakClient, device, target_name)
 
-            # Authenticate: write password to DD01 (empty string if no password set).
-            # The thermostat silently ignores commands sent without prior authentication.
-            import asyncio
+            # Authenticate: write password to DD01 before sending commands.
+            # Skip if no password is configured — some firmware versions reject empty writes
+            # or don't expose DD01 at all. Catch errors so a missing/unwritable DD01
+            # doesn't prevent the reboot attempt.
             await asyncio.sleep(_BLE_AUTH_DELAY)
-            await client.write_gatt_char(
-                _BLE_PWD_UUID, self._ble_password.encode("utf-8"), response=True
-            )
-            _LOGGER.debug("EasyTouch %s: BLE authenticated", self._serial)
+            if self._ble_password:
+                try:
+                    await client.write_gatt_char(
+                        _BLE_PWD_UUID, self._ble_password.encode("utf-8"), response=True
+                    )
+                    _LOGGER.debug("EasyTouch %s: BLE password written", self._serial)
+                except BleakError as exc:
+                    _LOGGER.debug(
+                        "EasyTouch %s: BLE password write failed (continuing): %s",
+                        self._serial, exc,
+                    )
+            else:
+                _LOGGER.debug("EasyTouch %s: no BLE password configured — skipping auth", self._serial)
 
             await client.write_gatt_char(_BLE_CMD_UUID, _BLE_REBOOT_CMD, response=True)
 
