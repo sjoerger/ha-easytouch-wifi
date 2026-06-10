@@ -19,7 +19,8 @@ This integration was built as a more reliable alternative to the existing BLE-ba
 - **Weather location** — sends your HA home coordinates to the thermostat on connect and hourly so the device displays accurate local weather
 - **Diagnostic sensors** — serial number, firmware version, model, device type, MQTT endpoint
 - **Cloud connectivity sensor** — know when the device loses its AWS connection
-- **Reboot button** — send a reboot command to the thermostat
+- **Reboot button** — send a reboot command over the cloud connection
+- **Bluetooth Reboot button** — send a reboot command via Bluetooth LE as a fallback when the thermostat has lost its cloud connection
 - **No local infrastructure required** — connects directly to AWS IoT Core using mutual TLS
 
 ---
@@ -76,7 +77,10 @@ To add a second thermostat under the same account, repeat the process with the o
 | Firmware | `update` | Shows installed vs latest firmware; install button sends update command to device |
 | Low Temperature Alert | `number` | Alert threshold lower bound (40–108°F); triggers app push notification |
 | High Temperature Alert | `number` | Alert threshold upper bound (42–110°F); triggers app push notification |
-| Reboot | `button` | Send a reboot command to the thermostat |
+| Reboot | `button` | Send a reboot command over the cloud (MQTT) connection |
+| Bluetooth Reboot | `button` | Send a reboot command via Bluetooth LE — works when the cloud connection is down |
+| Thermostat Wi-Fi | `binary_sensor` | Device-reported Wi-Fi connection status (unavailable when data is stale) |
+| Thermostat Cloud | `binary_sensor` | Device-reported AWS IoT connection status (unavailable when data is stale) |
 
 ---
 
@@ -109,9 +113,21 @@ The provisioned certificate is stored encrypted in your Home Assistant config en
 - Ensure you have an active internet connection — provisioning requires AWS API access.
 
 **Device shows unavailable**
-- Check the **Cloud Connected** sensor. If it's `off`, the thermostat has lost its AWS connection (check the RV's Wi-Fi).
-- Check the **Data Healthy** sensor. If it's `on` (problem), no data has been received in 60 seconds.
+- Check the **Cloud Connected** sensor. If it's `off`, HA itself has lost its MQTT connection to AWS.
+- Check the **Data Healthy** sensor. If it's `on` (problem), no data has been received in 60 seconds — the thermostat may have lost its internet connection even though HA's connection is fine.
+- Check the **Thermostat Wi-Fi** and **Thermostat Cloud** sensors (when data is fresh) to see the device's own reported connectivity status.
 - Check Home Assistant logs for MQTT connection errors.
+
+**Thermostat lost internet connection**
+- If **Cloud Connected** is `on` but **Data Healthy** is `on` (problem), the thermostat can't reach AWS but HA can.
+- Try the **Bluetooth Reboot** button to restart the thermostat via BLE — useful when the device has gotten into a bad connectivity state.
+- The HA host must have a Bluetooth adapter and be within BLE range (~10m) of the thermostat.
+- You can automate this: trigger **Bluetooth Reboot** when **Data Healthy** has been `on` for several minutes while **Cloud Connected** is also `on`.
+
+**Bluetooth Reboot button doesn't work**
+- Ensure the HA host has a Bluetooth adapter.
+- The thermostat must be within Bluetooth range — check HA logs for "BLE scan failed" or "not found" messages.
+- The button will run an active 5-second BLE scan if the device isn't in HA's passive scan cache; this is normal and expected.
 
 **Wrong temperature unit**
 - The integration uses Fahrenheit, matching the device's native protocol. Use Home Assistant's unit conversion if needed.
