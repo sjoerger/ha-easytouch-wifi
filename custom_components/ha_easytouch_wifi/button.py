@@ -20,7 +20,7 @@ _LOGGER = logging.getLogger(__name__)
 _BLE_PWD_UUID   = "0000dd01-0000-1000-8000-00805f9b34fb"   # password auth (written once on connect)
 _BLE_CMD_UUID   = "0000ee01-0000-1000-8000-00805f9b34fb"   # write command
 _BLE_RSP_UUID   = "0000ff01-0000-1000-8000-00805f9b34fb"   # read response
-_BLE_REBOOT_CMD = b'{"zone":0,"reset":" OK"}'   # space before OK matches BLE protocol
+_BLE_REBOOT_CMD = b'{"Type":"Change","Changes":{"zone":0,"reset":" OK"}}'  # full JSON wrapper required
 _BLE_AUTH_DELAY      = 0.20   # seconds after connect before/after auth (matches ha-easytouch)
 _BLE_POST_WRITE_DELAY = 0.10  # seconds to wait before reading response
 
