@@ -153,12 +153,9 @@ class EasyTouchBLERebootButton(ButtonEntity):
         try:
             client = await establish_connection(BleakClient, device, target_name)
 
-            # Authenticate: write password to DD01 before sending commands.
-            # Skip if no password is configured — some firmware versions reject empty writes
-            # or don't expose DD01 at all. Catch errors so a missing/unwritable DD01
-            # doesn't prevent the reboot attempt.
-            await asyncio.sleep(_BLE_AUTH_DELAY)
+            # Authenticate: write password to DD01 before sending commands (only if set).
             if self._ble_password:
+                await asyncio.sleep(_BLE_AUTH_DELAY)
                 try:
                     await client.write_gatt_char(
                         _BLE_PWD_UUID, self._ble_password.encode("utf-8"), response=True
@@ -169,10 +166,10 @@ class EasyTouchBLERebootButton(ButtonEntity):
                         "EasyTouch %s: BLE password write failed (continuing): %s",
                         self._serial, exc,
                     )
-            else:
-                _LOGGER.debug("EasyTouch %s: no BLE password configured — skipping auth", self._serial)
 
-            await client.write_gatt_char(_BLE_CMD_UUID, _BLE_REBOOT_CMD, response=True)
+            # Use response=False (Write Command) — the characteristic may not support
+            # Write Request, which would cause GATT_UNLIKELY_ERROR with response=True.
+            await client.write_gatt_char(_BLE_CMD_UUID, _BLE_REBOOT_CMD, response=False)
 
             # Write with response=True means the device acknowledged receipt at the GATT level.
             # Log success immediately — the thermostat may start rebooting before we can read back.
