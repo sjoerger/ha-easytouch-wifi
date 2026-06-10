@@ -161,15 +161,27 @@ class EasyTouchBLERebootButton(ButtonEntity):
         try:
             client = await establish_connection(client_cls, device, target_name)
 
+            # Log available characteristics at DEBUG level to aid future diagnosis.
+            for svc in client.services:
+                for char in svc.characteristics:
+                    _LOGGER.debug(
+                        "EasyTouch %s BLE char: %s props=%s",
+                        self._serial, char.uuid, char.properties,
+                    )
+
             # Read device info first — ha-easytouch does this before writing commands
             # (sequence: connect → 200ms → read info → 200ms → auth → command).
             await asyncio.sleep(_BLE_AUTH_DELAY)
             for info_uuid in (
                 "00002a26-0000-1000-8000-00805f9b34fb",   # firmware revision
                 "00002a24-0000-1000-8000-00805f9b34fb",   # model number
+                "00002a29-0000-1000-8000-00805f9b34fb",   # manufacturer name
             ):
                 try:
-                    await client.read_gatt_char(info_uuid)
+                    val = await client.read_gatt_char(info_uuid)
+                    _LOGGER.debug(
+                        "EasyTouch %s: read %s = %r", self._serial, info_uuid, val
+                    )
                     break
                 except BleakError:
                     pass
