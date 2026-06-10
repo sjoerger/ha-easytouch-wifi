@@ -55,7 +55,7 @@ This integration was built as a more reliable alternative to the existing BLE-ba
 2. Search for **Micro-Air EasyTouch Wi-Fi**.
 3. Enter your Micro-Air app **username** and **password**.
    - Home Assistant will authenticate with AWS Cognito and provision a unique IoT certificate for this installation. This takes a few seconds.
-4. Enter your thermostat's **serial number** (e.g. `352016109`).
+4. Enter your thermostat's **serial number** (e.g. `352016109`) and, if your thermostat has a Bluetooth password configured, enter it in the **Bluetooth password** field (leave blank if not set).
 5. The device will appear with all entities automatically.
 
 To add a second thermostat under the same account, repeat the process with the other serial number — each thermostat gets its own config entry and IoT certificate.
@@ -128,6 +128,7 @@ The provisioned certificate is stored encrypted in your Home Assistant config en
 - Ensure the HA host has a Bluetooth adapter.
 - The thermostat must be within Bluetooth range — check HA logs for "BLE scan failed" or "not found" messages.
 - The button will run an active 5-second BLE scan if the device isn't in HA's passive scan cache; this is normal and expected.
+- **The thermostat requires a Bluetooth password before it will accept commands.** If the button appears to connect but the device doesn't reboot, remove and re-add the integration and enter the BLE password in the **Bluetooth password** field. The password can be found or set in the Micro-Air app's thermostat settings.
 
 **Wrong temperature unit**
 - The integration uses Fahrenheit, matching the device's native protocol. Use Home Assistant's unit conversion if needed.

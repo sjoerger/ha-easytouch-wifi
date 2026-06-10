@@ -461,3 +461,61 @@ The app supports two transports — it selects based on `EasyTouch_RV.mConnectWi
 - **Bluetooth LE** — fallback, writes JSON bytes directly via `BluetoothLeService`
 
 Both transports use the same JSON message format.
+
+---
+
+## Bluetooth LE transport
+
+### GATT service and characteristics
+
+| UUID | Purpose |
+|---|---|
+| `000000ff-0000-1000-8000-00805f9b34fb` | Custom service |
+| `0000dd01-0000-1000-8000-00805f9b34fb` | **Password** — write UTF-8 password before sending commands |
+| `0000ee01-0000-1000-8000-00805f9b34fb` | **JSON command** — write commands here (Write with Response) |
+| `0000ff01-0000-1000-8000-00805f9b34fb` | **JSON response** — read response after command (100ms delay) |
+| `0000180a-0000-1000-8000-00805f9b34fb` | Device Information Service (standard BLE) |
+
+### Connection sequence
+
+The thermostat **requires authentication before it will execute commands**. Sending a command without the prior password write results in it being silently ignored (or a GATT error is returned).
+
+```
+1. connect (BleakClientWithServiceCache / establish_connection)
+2. wait 200ms
+3. read any Device Information Service characteristic (initialises GATT state)
+4. wait 200ms
+5. write password bytes to DD01 (Write with Response)
+6. send JSON command to EE01 (Write with Response)
+7. wait 100ms, read response from FF01 (best-effort — may fail if device reboots)
+```
+
+### Password
+
+- Written as UTF-8 encoded bytes to `0000dd01`
+- Configured per-device by the user in the Micro-Air app
+- **Required** — thermostats silently discard commands if no password write precedes them
+- Writing an empty password (`b""`) returns `GATT_UNLIKELY_ERROR` — only write if a password is set
+
+### Command format
+
+Identical to MQTT — full `{"Type":"Change","Changes":{...}}` wrapper required:
+
+```json
+{"Type":"Change","Changes":{"zone":0,"reset":" OK"}}
+```
+
+Note the **space before `" OK"`** in BLE commands — this differs from the MQTT reboot which uses `"OK"` without a space.
+
+### Device identification
+
+The thermostat advertises over BLE as `"EasyTouch <serial>"` (e.g. `"EasyTouch 352016364"`). No connection is needed to identify the correct device — match by exact advertisement name.
+
+### GATT error behaviour
+
+`GATT_UNLIKELY_ERROR` (code 14) returned from a Write Request to `EE01` does **not** mean failure. The device processes the command and begins executing it (e.g. reboot), then returns this error because it can no longer send a clean ATT Write Response. Treat `BleakGATTProtocolError` from the command write as success.
+
+### Source files
+
+- `com/microair/android/easyzone_rv/Bluetooth/BluetoothLeService.java` — `writeJSON_BT()`, UUID definitions
+- `/Users/steve/temp/ha-easytouch/custom_components/ha_easytouch/coordinator.py` — `_finish_connect()`, auth sequence, timing constants
