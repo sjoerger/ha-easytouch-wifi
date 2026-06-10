@@ -25,6 +25,16 @@ This integration was built as a more reliable alternative to the existing BLE-ba
 
 ---
 
+## Known Working Devices
+
+| Model | Firmware | Zones | Notes |
+|---|---|---|---|
+| Coleman Single Zone Replacement EasyTouch RV 352C | 1.0.7.0 | 1 | Confirmed working |
+
+Other EasyTouch RV models with Wi-Fi capability and firmware rev 5+ are expected to work, but have not been independently verified. If you have confirmed compatibility with a different model, please open an issue so it can be added here.
+
+---
+
 ## Requirements
 
 - Home Assistant 2024.1.0 or newer
