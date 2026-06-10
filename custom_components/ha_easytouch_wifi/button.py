@@ -200,25 +200,24 @@ class EasyTouchBLERebootButton(ButtonEntity):
                         self._serial, exc,
                     )
 
-            await client.write_gatt_char(_BLE_CMD_UUID, _BLE_REBOOT_CMD, response=True)
+            try:
+                await client.write_gatt_char(_BLE_CMD_UUID, _BLE_REBOOT_CMD, response=True)
+            except BleakError as exc:
+                # A GATT protocol error here means the device received the write but
+                # returned an error response — most likely because it has already started
+                # rebooting before it could send a clean ATT Write ACK. Treat as success.
+                from bleak.exc import BleakGATTProtocolError
+                if not isinstance(exc, BleakGATTProtocolError):
+                    raise  # genuine connection/IO failure — bubble up
+                _LOGGER.debug(
+                    "EasyTouch %s: GATT error on write (device likely rebooting): %s",
+                    self._serial, exc,
+                )
 
-            # Write with response=True means the device acknowledged receipt at the GATT level.
-            # Log success immediately — the thermostat may start rebooting before we can read back.
             _LOGGER.info(
-                "EasyTouch %s: BLE reboot command acknowledged by device at %s",
+                "EasyTouch %s: BLE reboot command sent to %s",
                 self._serial, device.address,
             )
-
-            # Best-effort response read — may fail if device reboots immediately.
-            await asyncio.sleep(_BLE_POST_WRITE_DELAY)
-            try:
-                rsp_raw = await client.read_gatt_char(_BLE_RSP_UUID)
-                rsp = rsp_raw.decode("utf-8", errors="replace").strip()
-                _LOGGER.debug("EasyTouch %s: BLE response: %s", self._serial, rsp)
-            except BleakError:
-                _LOGGER.debug(
-                    "EasyTouch %s: no BLE response (device likely rebooting)", self._serial
-                )
 
         except BleakError as exc:
             _LOGGER.warning(
