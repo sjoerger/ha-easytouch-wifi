@@ -150,14 +150,25 @@ class EasyTouchBLERebootButton(ButtonEntity):
             client = await establish_connection(BleakClient, device, target_name)
             await client.write_gatt_char(_BLE_CMD_UUID, _BLE_REBOOT_CMD, response=True)
 
+            # Write with response=True means the device acknowledged receipt at the GATT level.
+            # Log success immediately — the thermostat may start rebooting before we can read back.
+            _LOGGER.info(
+                "EasyTouch %s: BLE reboot command acknowledged by device at %s",
+                self._serial, device.address,
+            )
+
+            # Best-effort response read — may fail if device reboots immediately.
             import asyncio
             await asyncio.sleep(_BLE_POST_WRITE_DELAY)
-            rsp_raw = await client.read_gatt_char(_BLE_RSP_UUID)
-            rsp = rsp_raw.decode("utf-8", errors="replace").strip()
-            _LOGGER.info(
-                "EasyTouch %s: BLE reboot acknowledged — response: %s",
-                self._serial, rsp,
-            )
+            try:
+                rsp_raw = await client.read_gatt_char(_BLE_RSP_UUID)
+                rsp = rsp_raw.decode("utf-8", errors="replace").strip()
+                _LOGGER.debug("EasyTouch %s: BLE response: %s", self._serial, rsp)
+            except BleakError:
+                _LOGGER.debug(
+                    "EasyTouch %s: no BLE response (device likely rebooting)", self._serial
+                )
+
         except BleakError as exc:
             _LOGGER.warning(
                 "EasyTouch %s: BLE reboot failed: %s", self._serial, exc,
