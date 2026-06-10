@@ -94,7 +94,7 @@ class EasyTouchBLERebootButton(ButtonEntity):
         """Find thermostat via BLE, verify serial, send reboot command."""
         try:
             from homeassistant.components.bluetooth import async_discovered_service_info
-            from bleak import BleakClient, BleakError
+            from bleak import BleakClient, BleakError, BleakScanner
         except ImportError:
             _LOGGER.error(
                 "EasyTouch %s: Bluetooth support unavailable in this HA installation",
@@ -102,51 +102,68 @@ class EasyTouchBLERebootButton(ButtonEntity):
             )
             return
 
+        # Fast path: check HA's passive scan cache first
         candidates = [
-            info
+            info.device
             for info in async_discovered_service_info(self.hass, connectable=True)
             if info.name and "EasyTouch" in info.name
         ]
 
+        # Slow path: active scan if cache was empty
+        if not candidates:
+            _LOGGER.debug(
+                "EasyTouch %s: scan cache empty — running active BLE scan (5s)...",
+                self._serial,
+            )
+            try:
+                found = await BleakScanner.discover(timeout=5.0)
+                candidates = [d for d in found if d.name and "EasyTouch" in d.name]
+            except BleakError as exc:
+                _LOGGER.error(
+                    "EasyTouch %s: BLE scan failed — is Bluetooth hardware available? (%s)",
+                    self._serial, exc,
+                )
+                return
+
         if not candidates:
             _LOGGER.warning(
-                "EasyTouch %s: no EasyTouch BLE devices in scan cache — "
-                "ensure the thermostat is within Bluetooth range",
+                "EasyTouch %s: no EasyTouch BLE devices found — "
+                "thermostat may be out of Bluetooth range",
                 self._serial,
             )
             return
 
         _LOGGER.debug(
-            "EasyTouch %s: %d BLE candidate(s) found: %s",
+            "EasyTouch %s: %d BLE candidate(s): %s",
             self._serial,
             len(candidates),
-            [i.address for i in candidates],
+            [d.address for d in candidates],
         )
 
-        for info in candidates:
+        for device in candidates:
             try:
-                async with BleakClient(info.device) as client:
+                async with BleakClient(device) as client:
                     serial_raw = await client.read_gatt_char(_BLE_SERIAL_UUID)
                     ble_serial = serial_raw.decode("utf-8").strip()
 
                     if ble_serial != self._serial:
                         _LOGGER.debug(
                             "BLE device %s has serial %s, need %s — skipping",
-                            info.address, ble_serial, self._serial,
+                            device.address, ble_serial, self._serial,
                         )
                         continue
 
                     await client.write_gatt_char(_BLE_CMD_UUID, _BLE_REBOOT_CMD, response=True)
                     _LOGGER.info(
                         "EasyTouch %s: BLE reboot command sent via %s",
-                        self._serial, info.address,
+                        self._serial, device.address,
                     )
                     return
 
             except BleakError as exc:
                 _LOGGER.warning(
                     "EasyTouch %s: BLE connection to %s failed: %s",
-                    self._serial, info.address, exc,
+                    self._serial, device.address, exc,
                 )
 
         _LOGGER.warning(
