@@ -19,6 +19,7 @@ from .const import (
     AMAZON_ROOT_CA_1,
     APP_CLIENT_ID,
     APP_CLIENT_SECRET,
+    CONF_BLE_PASSWORD,
     CONF_CA_PEM,
     CONF_CLIENT_CERT,
     CONF_CLIENT_KEY,
@@ -44,6 +45,7 @@ STEP_USER_SCHEMA = vol.Schema(
 STEP_SERIAL_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_SERIAL): str,
+        vol.Optional(CONF_BLE_PASSWORD, default=""): str,
     }
 )
 
@@ -226,6 +228,7 @@ class EasyTouchWiFiConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_USERNAME: self._username,
                         CONF_PASSWORD: self._password_temp,
                         CONF_SERIAL: serial,
+                        CONF_BLE_PASSWORD: user_input.get(CONF_BLE_PASSWORD, ""),
                         CONF_CA_PEM: result["ca_pem"],
                         CONF_CLIENT_CERT: result["client_cert"],
                         CONF_CLIENT_KEY: result["client_key"],

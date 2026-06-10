@@ -11,16 +11,18 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CONF_SERIAL, DOMAIN
+from .const import CONF_BLE_PASSWORD, CONF_SERIAL, DOMAIN
 from .coordinator import EasyTouchMQTTCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
 # BLE GATT UUIDs (confirmed from ha-easytouch + Android BluetoothLeService.java)
+_BLE_PWD_UUID   = "0000dd01-0000-1000-8000-00805f9b34fb"   # password auth (written once on connect)
 _BLE_CMD_UUID   = "0000ee01-0000-1000-8000-00805f9b34fb"   # write command
 _BLE_RSP_UUID   = "0000ff01-0000-1000-8000-00805f9b34fb"   # read response
 _BLE_REBOOT_CMD = b'{"zone":0,"reset":" OK"}'   # space before OK matches BLE protocol
-_BLE_POST_WRITE_DELAY = 0.10                               # seconds to wait before reading response
+_BLE_AUTH_DELAY      = 0.20   # seconds after connect before/after auth (matches ha-easytouch)
+_BLE_POST_WRITE_DELAY = 0.10  # seconds to wait before reading response
 
 # The thermostat advertises as "EasyTouch <serial>" — use this for direct identification
 # rather than reading the Device Information Service serial characteristic (not present).
@@ -86,6 +88,7 @@ class EasyTouchBLERebootButton(ButtonEntity):
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self.hass = hass
         self._serial = entry.data[CONF_SERIAL]
+        self._ble_password = entry.data.get(CONF_BLE_PASSWORD, "")
         self._attr_unique_id = f"easytouch_wifi_{self._serial}_bluetooth_reboot"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self._serial)},
@@ -96,7 +99,8 @@ class EasyTouchBLERebootButton(ButtonEntity):
         )
 
     async def async_press(self) -> None:
-        """Find thermostat via BLE advertisement name, send reboot command."""
+        """Find thermostat via BLE advertisement name, authenticate, send reboot command."""
+        import asyncio
         try:
             from homeassistant.components.bluetooth import async_discovered_service_info
             from bleak import BleakClient, BleakError, BleakScanner
@@ -148,6 +152,16 @@ class EasyTouchBLERebootButton(ButtonEntity):
         client = None
         try:
             client = await establish_connection(BleakClient, device, target_name)
+
+            # Authenticate: write password to DD01 (empty string if no password set).
+            # The thermostat silently ignores commands sent without prior authentication.
+            import asyncio
+            await asyncio.sleep(_BLE_AUTH_DELAY)
+            await client.write_gatt_char(
+                _BLE_PWD_UUID, self._ble_password.encode("utf-8"), response=True
+            )
+            _LOGGER.debug("EasyTouch %s: BLE authenticated", self._serial)
+
             await client.write_gatt_char(_BLE_CMD_UUID, _BLE_REBOOT_CMD, response=True)
 
             # Write with response=True means the device acknowledged receipt at the GATT level.
@@ -158,7 +172,6 @@ class EasyTouchBLERebootButton(ButtonEntity):
             )
 
             # Best-effort response read — may fail if device reboots immediately.
-            import asyncio
             await asyncio.sleep(_BLE_POST_WRITE_DELAY)
             try:
                 rsp_raw = await client.read_gatt_char(_BLE_RSP_UUID)

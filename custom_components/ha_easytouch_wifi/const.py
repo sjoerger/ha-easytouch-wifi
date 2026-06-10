@@ -9,6 +9,7 @@ CONF_CA_PEM = "ca_pem"
 CONF_CLIENT_CERT = "client_cert"
 CONF_CLIENT_KEY = "client_key"
 CONF_MQTT_ENDPOINT = "mqtt_endpoint"
+CONF_BLE_PASSWORD = "ble_password"   # optional; empty string if thermostat has no BLE password
 
 # ── AWS / Cognito constants ───────────────────────────────────────────────────
 REGION = "us-east-1"

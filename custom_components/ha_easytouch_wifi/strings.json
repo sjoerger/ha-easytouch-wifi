@@ -17,7 +17,8 @@
         "title": "Add thermostat",
         "description": "Enter the serial number printed on your EasyTouch thermostat. You are signed in as **{username}**.\n\nTo add additional thermostats, run this setup again after finishing.",
         "data": {
-          "serial": "Device serial number"
+          "serial": "Device serial number",
+          "ble_password": "Bluetooth password (leave blank if not set)"
         }
       }
     },
