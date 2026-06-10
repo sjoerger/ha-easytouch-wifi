@@ -149,13 +149,34 @@ class EasyTouchBLERebootButton(ButtonEntity):
             return
 
         _LOGGER.debug("EasyTouch %s: connecting to %s", self._serial, device.address)
+        # BleakClientWithServiceCache caches service discovery between connections,
+        # matching ha-easytouch's approach for reliable characteristic access.
+        try:
+            from bleak_retry_connector import BleakClientWithServiceCache
+            client_cls = BleakClientWithServiceCache
+        except ImportError:
+            client_cls = BleakClient
+
         client = None
         try:
-            client = await establish_connection(BleakClient, device, target_name)
+            client = await establish_connection(client_cls, device, target_name)
+
+            # Read device info first — ha-easytouch does this before writing commands
+            # (sequence: connect → 200ms → read info → 200ms → auth → command).
+            await asyncio.sleep(_BLE_AUTH_DELAY)
+            for info_uuid in (
+                "00002a26-0000-1000-8000-00805f9b34fb",   # firmware revision
+                "00002a24-0000-1000-8000-00805f9b34fb",   # model number
+            ):
+                try:
+                    await client.read_gatt_char(info_uuid)
+                    break
+                except BleakError:
+                    pass
+            await asyncio.sleep(_BLE_AUTH_DELAY)
 
             # Authenticate: write password to DD01 before sending commands (only if set).
             if self._ble_password:
-                await asyncio.sleep(_BLE_AUTH_DELAY)
                 try:
                     await client.write_gatt_char(
                         _BLE_PWD_UUID, self._ble_password.encode("utf-8"), response=True
@@ -167,9 +188,7 @@ class EasyTouchBLERebootButton(ButtonEntity):
                         self._serial, exc,
                     )
 
-            # Use response=False (Write Command) — the characteristic may not support
-            # Write Request, which would cause GATT_UNLIKELY_ERROR with response=True.
-            await client.write_gatt_char(_BLE_CMD_UUID, _BLE_REBOOT_CMD, response=False)
+            await client.write_gatt_char(_BLE_CMD_UUID, _BLE_REBOOT_CMD, response=True)
 
             # Write with response=True means the device acknowledged receipt at the GATT level.
             # Log success immediately — the thermostat may start rebooting before we can read back.
