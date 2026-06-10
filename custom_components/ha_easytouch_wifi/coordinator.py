@@ -261,7 +261,7 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
     async def async_set_preset_mode(self, zone: int, preset: str) -> None:
         mode_num = HEAT_TYPE_PRESETS.get(preset)
         if mode_num is None:
-            _LOGGER.warning("Unknown preset: %s", preset)
+            _LOGGER.warning("EasyTouch %s unknown preset: %s", self._serial, preset)
             return
         self.send_change({"zone": zone, "power": 1, "mode": mode_num})
         self.suppress_status()
@@ -319,7 +319,7 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
             try:
                 await coro_factory()
             except Exception as exc:
-                _LOGGER.debug("Debounce task error: %s", exc)
+                _LOGGER.debug("EasyTouch %s debounce task error: %s", self._serial, exc)
 
         self._debounce_tasks[key] = self.entry.async_create_background_task(
             self.hass, _run(), f"easytouch_wifi_debounce_{key}"
@@ -328,13 +328,13 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
     def send_change(self, changes: dict) -> None:
         """Publish a Change command immediately (thread-safe)."""
         payload = json.dumps({"Type": "Change", "Changes": changes}, separators=(",", ":"))
-        _LOGGER.info("Publishing command: %.120s", payload)
+        _LOGGER.info("EasyTouch %s publishing command: %.120s", self._serial, payload)
         self._publish(payload)
 
     def publish_json(self, obj: dict) -> None:
         """Publish an arbitrary JSON object to the device topic (thread-safe)."""
         payload = json.dumps(obj, separators=(",", ":"))
-        _LOGGER.info("Publishing command: %.200s", payload)
+        _LOGGER.info("EasyTouch %s publishing command: %.200s", self._serial, payload)
         self._publish(payload)
 
     def _publish(self, payload: str) -> None:
@@ -342,7 +342,7 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         if self._mqtt is not None and self._connected:
             self._mqtt.publish(self._topic, payload, qos=0)
         else:
-            _LOGGER.debug("Cannot publish — not connected")
+            _LOGGER.debug("EasyTouch %s cannot publish — not connected", self._serial)
 
     # ──────────────────────────────────────────────────────────────────────────
     # Connection lifecycle
@@ -355,13 +355,13 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         try:
             await self.hass.async_add_executor_job(self._setup_mqtt_client)
         except Exception as exc:
-            _LOGGER.error("Failed to build SSL context: %s", exc)
+            _LOGGER.error("EasyTouch %s failed to build SSL context: %s", self._serial, exc)
             return
 
         try:
             await self.hass.async_add_executor_job(self._connect_sync)
         except Exception as exc:
-            _LOGGER.error("Initial MQTT connect failed: %s", exc)
+            _LOGGER.error("EasyTouch %s initial MQTT connect failed: %s", self._serial, exc)
             self._schedule_reconnect(RECONNECT_BACKOFF_BASE_S)
             return
 
@@ -413,7 +413,7 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
 
     def _connect_sync(self) -> None:
         """Blocking MQTT connect + start network thread. Runs in executor."""
-        _LOGGER.debug("Connecting to %s:%d", self._endpoint, MQTT_PORT)
+        _LOGGER.debug("EasyTouch %s connecting to %s:%d", self._serial, self._endpoint, MQTT_PORT)
         self._mqtt.connect(self._endpoint, MQTT_PORT, keepalive=60)
         self._mqtt.loop_start()
 
@@ -431,7 +431,7 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         _LOGGER.info("EasyTouch %s connected to MQTT broker", self._serial)
         client.subscribe(self._topic)
         client.subscribe(self._topic + "/#")
-        _LOGGER.debug("Subscribed to %s and %s/#", self._topic, self._topic)
+        _LOGGER.debug("EasyTouch %s subscribed to %s and %s/#", self._serial, self._topic, self._topic)
 
         # Request zone configs (only on first connect; skip if already done)
         if not self._config_done:
@@ -447,7 +447,7 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
             payload = msg.payload.decode("utf-8")
             obj = json.loads(payload)
         except Exception as exc:
-            _LOGGER.warning("Failed to parse MQTT message: %s", exc)
+            _LOGGER.warning("EasyTouch %s failed to parse MQTT message: %s", self._serial, exc)
             return
         self._loop.call_soon_threadsafe(self._handle_json, msg.topic, obj)
 
@@ -563,7 +563,7 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
                 RECONNECT_BACKOFF_BASE_S * (2 ** min(self._consecutive_failures, 10)),
                 RECONNECT_BACKOFF_CAP_S,
             )
-            _LOGGER.warning("Reconnect failed: %s — retry in %.0fs", exc, backoff)
+            _LOGGER.warning("EasyTouch %s reconnect failed: %s — retry in %.0fs", self._serial, exc, backoff)
             self._schedule_reconnect(backoff)
 
     # ──────────────────────────────────────────────────────────────────────────
@@ -580,13 +580,13 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         elif (rtype == "Response" and rt == "Status") or rtype == "Status":
             self._parse_status(obj)
         elif rt == "OK":
-            _LOGGER.info("Device acknowledged command")
+            _LOGGER.info("EasyTouch %s acknowledged command", self._serial)
         elif "Change" in rtype:
-            _LOGGER.debug("Change message topic=%s payload=%s", topic, obj)
+            _LOGGER.debug("EasyTouch %s change message topic=%s payload=%s", self._serial, topic, obj)
         elif rtype in ("Get Status", "Get Config", "Get Schedule", "ExtraData"):
             pass
         else:
-            _LOGGER.debug("Unhandled message topic=%s Type=%r RT=%r payload=%s", topic, rtype, rt, obj)
+            _LOGGER.debug("EasyTouch %s unhandled message topic=%s Type=%r RT=%r payload=%s", self._serial, topic, rtype, rt, obj)
 
     # ──────────────────────────────────────────────────────────────────────────
     # Config parsing
@@ -598,7 +598,7 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         # or the CFG field may be a JSON string — handle both.
         raw_cfg = obj.get("CFG")
         if raw_cfg is None:
-            _LOGGER.debug("No CFG in config response")
+            _LOGGER.debug("EasyTouch %s no CFG in config response", self._serial)
             return
 
         cfg = raw_cfg
@@ -606,7 +606,7 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
             try:
                 cfg = json.loads(cfg)
             except json.JSONDecodeError:
-                _LOGGER.warning("Could not parse CFG string: %.80s", raw_cfg)
+                _LOGGER.warning("EasyTouch %s could not parse CFG string: %.80s", self._serial, raw_cfg)
                 return
 
         # Single-zone response: CFG dict has Zone/MAV/FA/SPL directly
@@ -648,8 +648,8 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
             max_heat_sp=max_heat,
         )
         _LOGGER.info(
-            "Zone %d config: MAV=0x%X, cool=%d-%d°F, heat=%d-%d°F",
-            zone, mav, min_cool, max_cool, min_heat, max_heat,
+            "EasyTouch %s zone %d config: MAV=0x%X, cool=%d-%d°F, heat=%d-%d°F",
+            self._serial, zone, mav, min_cool, max_cool, min_heat, max_heat,
         )
 
     # ──────────────────────────────────────────────────────────────────────────
@@ -663,7 +663,7 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
 
         z_sts = obj.get("Z_sts")
         if not z_sts:
-            _LOGGER.warning("No Z_sts in status response")
+            _LOGGER.warning("EasyTouch %s no Z_sts in status response", self._serial)
             return
 
         prm = obj.get("PRM", [])
@@ -681,7 +681,7 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
             except (ValueError, TypeError):
                 continue
             if not isinstance(arr, list) or len(arr) < 12:
-                _LOGGER.warning("Invalid Z_sts data for zone %s", key)
+                _LOGGER.warning("EasyTouch %s invalid Z_sts data for zone %s", self._serial, key)
                 continue
 
             def _i(idx: int) -> int:
@@ -711,7 +711,7 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         available_zones = sorted(zones.keys())
 
         if self.is_status_suppressed():
-            _LOGGER.debug("Status suppressed (command in progress)")
+            _LOGGER.debug("EasyTouch %s status suppressed (command in progress)", self._serial)
             return
 
         self.thermostat_state = ThermostatState(
