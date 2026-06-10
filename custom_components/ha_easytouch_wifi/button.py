@@ -16,9 +16,11 @@ from .coordinator import EasyTouchMQTTCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-# BLE GATT UUID for the JSON command characteristic (confirmed from ha-easytouch + Android source)
-_BLE_CMD_UUID   = "0000ee01-0000-1000-8000-00805f9b34fb"
+# BLE GATT UUIDs (confirmed from ha-easytouch + Android BluetoothLeService.java)
+_BLE_CMD_UUID   = "0000ee01-0000-1000-8000-00805f9b34fb"   # write command
+_BLE_RSP_UUID   = "0000ff01-0000-1000-8000-00805f9b34fb"   # read response
 _BLE_REBOOT_CMD = b'{"zone":0,"reset":" OK"}'   # space before OK matches BLE protocol
+_BLE_POST_WRITE_DELAY = 0.10                               # seconds to wait before reading response
 
 # The thermostat advertises as "EasyTouch <serial>" — use this for direct identification
 # rather than reading the Device Information Service serial characteristic (not present).
@@ -147,9 +149,14 @@ class EasyTouchBLERebootButton(ButtonEntity):
         try:
             client = await establish_connection(BleakClient, device, target_name)
             await client.write_gatt_char(_BLE_CMD_UUID, _BLE_REBOOT_CMD, response=True)
+
+            import asyncio
+            await asyncio.sleep(_BLE_POST_WRITE_DELAY)
+            rsp_raw = await client.read_gatt_char(_BLE_RSP_UUID)
+            rsp = rsp_raw.decode("utf-8", errors="replace").strip()
             _LOGGER.info(
-                "EasyTouch %s: BLE reboot command sent via %s",
-                self._serial, device.address,
+                "EasyTouch %s: BLE reboot acknowledged — response: %s",
+                self._serial, rsp,
             )
         except BleakError as exc:
             _LOGGER.warning(
