@@ -1,7 +1,7 @@
 {
   "domain": "ha_easytouch_wifi",
   "name": "Micro-Air EasyTouch Wi-Fi",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "config_flow": true,
   "documentation": "https://github.com/sjoerger/ha-easytouch-wifi",
   "issue_tracker": "https://github.com/sjoerger/ha-easytouch-wifi/issues",
