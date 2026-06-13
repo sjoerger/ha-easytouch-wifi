@@ -576,6 +576,7 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
 
     @callback
     def _handle_json(self, topic: str, obj: dict) -> None:
+        _LOGGER.debug("EasyTouch %s rx: %s", self._serial, obj)
         rtype = obj.get("Type", "")
         rt = obj.get("RT", "")
 
