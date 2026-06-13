@@ -244,14 +244,25 @@ Sent by the iOS app to request supplemental device metadata. Response:
 | `SS` / `OS` / `AO` | Unknown — observed values: 27, 0, 3 |
 
 ### Get Config
+
+Omit `Zone` to request the full capability block (`MAV`/`FA`/`MA`/`SPL`):
+```json
+{"Type": "Get Config"}
+```
+
+Including `Zone` returns only bare per-zone setpoints with no capability data:
 ```json
 {"Type": "Get Config", "Zone": 0}
 ```
 
+**Always use the zoneless form** to retrieve capability data. The firmware branches on
+the presence of the `Zone` key: absent → full CFG block; present → per-zone setpoints
+lookup (returns `{"Zone": N}` if no per-zone data is stored for that zone).
+
 ### Get Modes
-```json
-{"Type": "Get Modes"}
-```
+
+Not implemented in firmware 1.0.7.0 — the string `Get Modes` does not appear in the
+binary. Mode availability is provided by the `MAV` field in the `Get Config` response.
 
 ### Get Schedule
 ```json
@@ -334,19 +345,38 @@ The `REV` field in status responses contains the firmware revision string (e.g. 
 
 ## Device → App: Config Response (`RT: "Config"`)
 
-Sent in response to `Get Config`. Contains per-zone configuration in a `CFG` string field, which is itself a JSON object with one key per zone (`"zone0"`, `"zone1"`, etc.).
+Sent in response to `Get Config`. The `CFG` field contains the zone configuration object
+directly (not wrapped in `zone0`/`zone1` sub-keys as the APK documentation implied).
 
-Each zone config object:
+Observed response to a zoneless `Get Config`:
+```json
+{
+  "Type": "Response", "RT": "Config", "TT": "EasyTouch", "SN": "352016364", "REV": "1.0.7.0",
+  "CFG": {
+    "Zone": 0,
+    "MAV": 3126,
+    "MA":  [0, 128, 192, 192, 192, 192, 192, 192, 160, 160, 160, 160, 192, 0, 0, 0],
+    "FA":  [16, 34, 194, 98, 226, 194, 17, 194, 194, 194, 194, 226, 194, 16, 16, 16],
+    "SPL": [55, 95, 40, 95]
+  }
+}
+```
 
 | Field | Type | Description |
 |---|---|---|
-| `Zone` | int | Zone number |
+| `Zone` | int | Zone number (0-based) |
 | `MAV` | int | Available modes bitmask — bit N set means mode N is available |
 | `SPL` | array | Setpoint limits: `[minCoolSP, maxCoolSP, minHeatSP, maxHeatSP]` (°F) |
-| `MA` | array | Mode array (16 ints) — per-mode configuration |
-| `FA` | array | Fan array (16 ints) — per-mode fan configuration |
+| `MA` | array | 16-element per-mode configuration array (purpose not fully decoded) |
+| `FA` | array | 16-element per-mode fan capability array — see Fan Array below |
 
-The app supports up to 4 zones (0–3). If all zones have `MAV = 0` the config is considered invalid.
+**`MAV` example:** `3126` = `0b110000110110` → bits 1,2,4,5,10,11 set →
+fan\_only, cool, furnace, heat\_pump, auto+heat\_pump, auto+furnace available.
+
+**`FA` array:** each entry is a bitmask for the corresponding mode (index = mode number):
+- bits 0–3 (`& 0x0F`): max fan speed supported (1=low only, 2=low+high, 3=low+med+high)
+- bit 6 (`0x40`): manual auto fan allowed
+- bit 7 (`0x80`): full auto fan allowed
 
 ---
 

@@ -437,11 +437,11 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         client.subscribe(self._topic + "/#")
         _LOGGER.debug("EasyTouch %s subscribed to %s and %s/#", self._serial, self._topic, self._topic)
 
-        # Request zone configs (only on first connect; skip if already done)
+        # Request zone config (only on first connect; skip if already done).
+        # Zoneless Get Config triggers the full CFG block (MAV/FA/MA/SPL).
+        # Per-zone requests return only bare {"Zone": N} with no capability data.
         if not self._config_done:
-            for zone in range(4):
-                payload = json.dumps({"Type": "Get Config", "Zone": zone})
-                client.publish(self._topic, payload, qos=0)
+            client.publish(self._topic, json.dumps({"Type": "Get Config"}), qos=0)
 
         # Signal HA event loop
         self._loop.call_soon_threadsafe(self._on_connected_ha)

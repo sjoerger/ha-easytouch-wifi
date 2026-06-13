@@ -6,12 +6,16 @@ Connects to AWS IoT and watches live status messages for a given device serial.
 Usage:
     python3 watch_device.py --serial "352016109"
     python3 watch_device.py --serial "352016109" --request-status
+    python3 watch_device.py --serial "352016364" --request-config
+    python3 watch_device.py --serial "352016364" --request-config --request-config-zone 0
 
 Options:
-    --serial          Device serial number (required)
-    --request-status  Send a Get Status request on connect to trigger an immediate update
-    --certs-dir       Directory containing ca.pem, client.crt, client.key (default: ./certs)
-    --endpoint        Override MQTT endpoint (default: read from certs/endpoint.txt)
+    --serial               Device serial number (required)
+    --request-status       Send a Get Status request on connect to trigger an immediate update
+    --request-config       Send a zoneless Get Config on connect (tests full CFG block with MAV/FA/SPL)
+    --request-config-zone  Also send a per-zone Get Config for the given zone number (0-3)
+    --certs-dir            Directory containing ca.pem, client.crt, client.key (default: ./certs)
+    --endpoint             Override MQTT endpoint (default: read from certs/endpoint.txt)
 
 Requirements:
     pip install paho-mqtt
@@ -94,10 +98,12 @@ def pretty_print_message(topic: str, payload: str):
 
 def main():
     parser = argparse.ArgumentParser(description="EasyZone RV - Device status watcher")
-    parser.add_argument("--serial",         required=True, help='Device serial number, e.g. "352016109"')
-    parser.add_argument("--request-status", action="store_true", help="Send Get Status on connect")
-    parser.add_argument("--certs-dir",      default=CERTS_DIR, help=f"Certs directory (default: {CERTS_DIR})")
-    parser.add_argument("--endpoint",       default=None, help="Override MQTT endpoint")
+    parser.add_argument("--serial",               required=True, help='Device serial number, e.g. "352016109"')
+    parser.add_argument("--request-status",       action="store_true", help="Send Get Status on connect")
+    parser.add_argument("--request-config",       action="store_true", help="Send zoneless Get Config on connect (triggers full MAV/FA/SPL response)")
+    parser.add_argument("--request-config-zone",  type=int, default=None, metavar="ZONE", help="Also send a per-zone Get Config for zone 0-3")
+    parser.add_argument("--certs-dir",            default=CERTS_DIR, help=f"Certs directory (default: {CERTS_DIR})")
+    parser.add_argument("--endpoint",             default=None, help="Override MQTT endpoint")
     args = parser.parse_args()
 
     endpoint = load_endpoint(args.certs_dir, args.endpoint)
@@ -123,6 +129,16 @@ def main():
             payload = json.dumps({"Type": "Get Status", "Zone": 0})
             client.publish(base_topic, payload)
             print(f"[*] Sent Get Status request to {base_topic}")
+
+        if args.request_config:
+            payload = json.dumps({"Type": "Get Config"})
+            client.publish(base_topic, payload)
+            print(f"[*] Sent zoneless Get Config to {base_topic}")
+
+        if args.request_config_zone is not None:
+            payload = json.dumps({"Type": "Get Config", "Zone": args.request_config_zone})
+            client.publish(base_topic, payload)
+            print(f"[*] Sent Get Config Zone={args.request_config_zone} to {base_topic}")
 
     def on_message(client, userdata, msg):
         pretty_print_message(msg.topic, msg.payload.decode("utf-8", errors="replace"))
