@@ -437,17 +437,9 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         client.subscribe(self._topic + "/#")
         _LOGGER.debug("EasyTouch %s subscribed to %s and %s/#", self._serial, self._topic, self._topic)
 
-        # Request zone config (only on first connect; skip if already done).
-        # Zoneless Get Config triggers the full CFG block (MAV/FA/MA/SPL).
-        # Per-zone requests return only bare {"Zone": N} with no capability data.
-        # Sleep briefly so the broker registers the subscription before the
-        # Config response arrives (~1s later); without this the response can
-        # arrive before AWS IoT activates our subscription and is silently dropped.
-        if not self._config_done:
-            time.sleep(0.5)
-            client.publish(self._topic, json.dumps({"Type": "Get Config"}), qos=0)
-
-        # Signal HA event loop
+        # Signal HA event loop — Get Config is sent from _on_connected_ha
+        # with an async delay so it runs on the HA event loop rather than
+        # blocking the paho network thread.
         self._loop.call_soon_threadsafe(self._on_connected_ha)
 
     def _on_message_cb(self, client, userdata, msg) -> None:
@@ -457,6 +449,10 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         except Exception as exc:
             _LOGGER.warning("EasyTouch %s failed to parse MQTT message: %s", self._serial, exc)
             return
+        rtype = obj.get("Type", "")
+        rt = obj.get("RT", "")
+        if (rtype == "Response" and rt == "Config") or rtype == "Config":
+            _LOGGER.debug("EasyTouch %s paho-rx Config: %s", self._serial, obj)
         self._loop.call_soon_threadsafe(self._handle_json, msg.topic, obj)
 
     def _on_disconnect_cb(self, client, userdata, disconnect_flags, reason_code, properties=None) -> None:
@@ -473,6 +469,10 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
     def _on_connected_ha(self) -> None:
         self._connected = True
         self._consecutive_failures = 0
+        if not self._config_done:
+            self.entry.async_create_background_task(
+                self.hass, self._request_config(), "easytouch_wifi_config_request"
+            )
         self._connected_event.set()
         # If we already had state, restore it (entities were unavailable during disconnect)
         if self.thermostat_state is not None:
@@ -484,6 +484,18 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         self._connected_event.clear()
         # Mark entities unavailable
         self.async_set_updated_data(None)
+
+    async def _request_config(self) -> None:
+        """Send a zoneless Get Config after a short delay.
+
+        Runs on the HA event loop so it doesn't block the paho network thread.
+        The 1s delay gives AWS IoT time to register the subscription before the
+        Config response (~1s RTT) arrives back.
+        """
+        await asyncio.sleep(1.0)
+        if not self._config_done and self._connected:
+            _LOGGER.debug("EasyTouch %s requesting Get Config", self._serial)
+            self._publish(json.dumps({"Type": "Get Config"}))
 
     # ──────────────────────────────────────────────────────────────────────────
     # Poll loop
