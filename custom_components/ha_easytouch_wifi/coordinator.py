@@ -548,7 +548,11 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
                 return
 
             if self._connected:
-                if not self._config_done:
+                if not self._config_done and (poll_count % location_interval) == 0:
+                    # Retry Get Config once per hour. The device ignores repeated
+                    # requests from the same MQTT client ID, so high-frequency retries
+                    # are pointless — this catches the rare case where the device is
+                    # fresh and ready to respond after a cooldown.
                     _LOGGER.debug(
                         "EasyTouch %s config not yet received — retrying Get Config",
                         self._serial,
