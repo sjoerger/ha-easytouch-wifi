@@ -440,7 +440,11 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         # Request zone config (only on first connect; skip if already done).
         # Zoneless Get Config triggers the full CFG block (MAV/FA/MA/SPL).
         # Per-zone requests return only bare {"Zone": N} with no capability data.
+        # Sleep briefly so the broker registers the subscription before the
+        # Config response arrives (~1s later); without this the response can
+        # arrive before AWS IoT activates our subscription and is silently dropped.
         if not self._config_done:
+            time.sleep(0.5)
             client.publish(self._topic, json.dumps({"Type": "Get Config"}), qos=0)
 
         # Signal HA event loop
@@ -532,6 +536,12 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
                 return
 
             if self._connected:
+                if not self._config_done:
+                    _LOGGER.debug(
+                        "EasyTouch %s config not yet received — retrying Get Config",
+                        self._serial,
+                    )
+                    self._publish(json.dumps({"Type": "Get Config"}))
                 include_loc = (poll_count % location_interval) == 0
                 self._publish(json.dumps(self._build_status_request(include_loc)))
                 poll_count += 1
