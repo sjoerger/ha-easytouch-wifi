@@ -38,6 +38,7 @@ async def async_setup_entry(
     async_add_entities([
         EasyTouchRebootButton(coordinator, entry),
         EasyTouchBLERebootButton(hass, entry),
+        EasyTouchRefreshConfigButton(coordinator, entry),
     ])
 
 
@@ -68,6 +69,38 @@ class EasyTouchRebootButton(ButtonEntity):
 
     async def async_press(self) -> None:
         await self._coordinator.async_reboot()
+
+
+class EasyTouchRefreshConfigButton(ButtonEntity):
+    """Button that clears stored config and requests a fresh Get Config.
+
+    Use after a thermostat swap or feature reconfiguration to force the
+    integration to re-discover available HVAC modes and capabilities.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "refresh_config"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:refresh"
+
+    def __init__(
+        self,
+        coordinator: EasyTouchMQTTCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        self._coordinator = coordinator
+        serial = entry.data[CONF_SERIAL]
+        self._attr_unique_id = f"easytouch_wifi_{serial}_refresh_config"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, serial)},
+            name=f"EasyTouch {serial}",
+            manufacturer="Micro-Air",
+            model="EasyTouch RV Wi-Fi",
+            serial_number=serial,
+        )
+
+    async def async_press(self) -> None:
+        await self._coordinator.async_refresh_config()
 
 
 class EasyTouchBLERebootButton(ButtonEntity):

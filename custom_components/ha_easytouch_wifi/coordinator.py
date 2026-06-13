@@ -33,7 +33,10 @@ from zoneinfo import ZoneInfo
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+
+_STORAGE_VERSION = 1
 
 from .const import (
     CONF_CA_PEM,
@@ -159,6 +162,9 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         self.config_index: str | None = None
         self.device_model: str | None = None
 
+        # Persistent config storage
+        self._store: Store = Store(hass, _STORAGE_VERSION, f"{DOMAIN}_{self._serial}")
+
         # Lifecycle
         self._poll_task: asyncio.Task | None = None
         self._config_done = False
@@ -245,6 +251,69 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         if allow_full_auto or allow_manual_auto:
             modes.append("auto")
         return modes or ["auto"]
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Config persistence
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def async_load_stored_config(self) -> None:
+        """Load persisted zone config from HA storage. Call before MQTT starts."""
+        data = await self._store.async_load()
+        if not data:
+            return
+        for zone_str, cfg_data in data.get("zone_configs", {}).items():
+            zone = int(zone_str)
+            self.zone_configs[zone] = ZoneConfig(
+                zone=zone,
+                available_modes_mask=cfg_data.get("mav", 0),
+                fan_array=cfg_data.get("fa", [0] * 16),
+                min_cool_sp=cfg_data.get("min_cool_sp", DEFAULT_MIN_TEMP),
+                max_cool_sp=cfg_data.get("max_cool_sp", DEFAULT_MAX_TEMP),
+                min_heat_sp=cfg_data.get("min_heat_sp", DEFAULT_MIN_TEMP),
+                max_heat_sp=cfg_data.get("max_heat_sp", DEFAULT_MAX_TEMP),
+            )
+        active = [z for z, c in self.zone_configs.items() if c.available_modes_mask != 0]
+        if active:
+            self._config_done = True
+            _LOGGER.info(
+                "EasyTouch %s loaded config from storage: zones=%s", self._serial, active
+            )
+
+    async def async_save_stored_config(self) -> None:
+        """Persist current zone config to HA storage."""
+        data = {
+            "zone_configs": {
+                str(zone): {
+                    "mav": cfg.available_modes_mask,
+                    "fa": cfg.fan_array,
+                    "min_cool_sp": cfg.min_cool_sp,
+                    "max_cool_sp": cfg.max_cool_sp,
+                    "min_heat_sp": cfg.min_heat_sp,
+                    "max_heat_sp": cfg.max_heat_sp,
+                }
+                for zone, cfg in self.zone_configs.items()
+                if cfg.available_modes_mask != 0
+            }
+        }
+        await self._store.async_save(data)
+
+    async def async_refresh_config(self) -> None:
+        """Clear stored config and request a fresh Get Config from the device.
+
+        Use this after a thermostat hardware swap or feature reconfiguration.
+        """
+        self._config_done = False
+        self.zone_configs.clear()
+        await self._store.async_save({})
+        if self._connected:
+            _LOGGER.info("EasyTouch %s requesting fresh Get Config", self._serial)
+            self._publish(json.dumps({"Type": "Get Config"}))
+        else:
+            _LOGGER.warning(
+                "EasyTouch %s: refresh_config called while disconnected — "
+                "will request on next connect",
+                self._serial,
+            )
 
     # ──────────────────────────────────────────────────────────────────────────
     # Command API (called from HA event loop)
@@ -649,13 +718,15 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
                 if key.startswith("zone") and isinstance(zone_cfg, dict):
                     self._store_zone_config(zone_cfg)
 
-        # Mark config done once we've seen at least one valid zone
+        # Mark config done once we've seen at least one valid zone and persist
         active = [z for z, c in self.zone_configs.items() if c.available_modes_mask != 0]
         if active and not self._config_done:
             self._config_done = True
             _LOGGER.info(
                 "EasyTouch %s config done. Active zones: %s", self._serial, active
             )
+        if active:
+            self.hass.async_create_task(self.async_save_stored_config())
 
     def _store_zone_config(self, cfg: dict) -> None:
         zone = int(cfg.get("Zone", 0))

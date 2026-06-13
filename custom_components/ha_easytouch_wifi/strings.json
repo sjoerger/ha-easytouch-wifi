@@ -51,6 +51,9 @@
       },
       "bluetooth_reboot": {
         "name": "Bluetooth Reboot"
+      },
+      "refresh_config": {
+        "name": "Refresh Capabilities"
       }
     },
     "climate": {

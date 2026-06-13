@@ -26,6 +26,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up EasyTouch Wi-Fi from a config entry."""
     coordinator = EasyTouchMQTTCoordinator(hass, entry)
 
+    # Load persisted zone config before MQTT connects so _config_done is set
+    # immediately and the correct presets are available from the first status update.
+    await coordinator.async_load_stored_config()
+
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
