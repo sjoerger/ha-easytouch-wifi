@@ -212,7 +212,11 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         """Return heat-source preset names available for a zone."""
         cfg = self.zone_configs.get(zone)
         if cfg is None or cfg.available_modes_mask == 0:
-            return []
+            # Device didn't return MAV in Config response (common for CI=131 units
+            # and any device not configured via BLE). Fall back to all presets so
+            # heat-source selection remains accessible, matching the all-modes
+            # fallback in get_available_hvac_modes().
+            return list(HEAT_TYPE_PRESETS.keys())
         mav = cfg.available_modes_mask
         return [
             name
