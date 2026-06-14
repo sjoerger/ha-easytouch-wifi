@@ -259,6 +259,7 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
     async def async_load_stored_config(self) -> None:
         """Load persisted zone config from HA storage. Call before MQTT starts."""
         data = await self._store.async_load()
+        _LOGGER.debug("EasyTouch %s store.async_load() returned: %r", self._serial, data)
         if not data:
             _LOGGER.debug("EasyTouch %s no stored config found — will fetch from device", self._serial)
             return
