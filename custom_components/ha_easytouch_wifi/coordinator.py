@@ -850,6 +850,34 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
 
         available_zones = sorted(zones.keys())
 
+        # Bootstrap zone configs from the CI field if the full Config response has
+        # not arrived yet. CI is present in every status message and encodes the
+        # device's capability class: bit 7 = valid, bit 0 = cool, bit 1 = heat.
+        # This keeps HVAC mode options correct across restarts even when storage
+        # is unavailable, using the same MAV values returned by the real Config
+        # response (CI=129→MAV=6, CI=131→MAV=3126, confirmed from device data).
+        # Zones with a proper Config-derived config are left untouched.
+        if not self._config_done:
+            ci = obj.get("CI")
+            if ci is not None and (ci & 0x80):  # bit 7 = valid/configured
+                mav = 0
+                if ci & 0x01:  # cool capable
+                    mav |= (1 << 1) | (1 << 2)                           # fan_only, cool
+                if ci & 0x02:  # heat capable
+                    mav |= (1 << 4) | (1 << 5) | (1 << 10) | (1 << 11)  # furnace, heat_pump, auto+hp, auto+furnace
+                if mav:
+                    for zone_num in available_zones:
+                        if zone_num not in self.zone_configs:
+                            self.zone_configs[zone_num] = ZoneConfig(
+                                zone=zone_num,
+                                available_modes_mask=mav,
+                                fan_array=[0] * 16,
+                                min_cool_sp=DEFAULT_MIN_TEMP,
+                                max_cool_sp=DEFAULT_MAX_TEMP,
+                                min_heat_sp=DEFAULT_MIN_TEMP,
+                                max_heat_sp=DEFAULT_MAX_TEMP,
+                            )
+
         if self.is_status_suppressed():
             _LOGGER.debug("EasyTouch %s status suppressed (command in progress)", self._serial)
             return
