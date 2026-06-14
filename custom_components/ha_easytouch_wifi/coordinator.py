@@ -260,6 +260,7 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         """Load persisted zone config from HA storage. Call before MQTT starts."""
         data = await self._store.async_load()
         if not data:
+            _LOGGER.debug("EasyTouch %s no stored config found — will fetch from device", self._serial)
             return
         for zone_str, cfg_data in data.get("zone_configs", {}).items():
             zone = int(zone_str)
@@ -281,21 +282,21 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
 
     async def async_save_stored_config(self) -> None:
         """Persist current zone config to HA storage."""
-        data = {
-            "zone_configs": {
-                str(zone): {
-                    "mav": cfg.available_modes_mask,
-                    "fa": cfg.fan_array,
-                    "min_cool_sp": cfg.min_cool_sp,
-                    "max_cool_sp": cfg.max_cool_sp,
-                    "min_heat_sp": cfg.min_heat_sp,
-                    "max_heat_sp": cfg.max_heat_sp,
-                }
-                for zone, cfg in self.zone_configs.items()
-                if cfg.available_modes_mask != 0
+        zones = {
+            str(zone): {
+                "mav": cfg.available_modes_mask,
+                "fa": cfg.fan_array,
+                "min_cool_sp": cfg.min_cool_sp,
+                "max_cool_sp": cfg.max_cool_sp,
+                "min_heat_sp": cfg.min_heat_sp,
+                "max_heat_sp": cfg.max_heat_sp,
             }
+            for zone, cfg in self.zone_configs.items()
+            if cfg.available_modes_mask != 0
         }
-        await self._store.async_save(data)
+        if not zones:
+            return
+        await self._store.async_save({"zone_configs": zones})
 
     async def async_refresh_config(self) -> None:
         """Clear stored config and request a fresh Get Config from the device.
