@@ -257,13 +257,46 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
     # ──────────────────────────────────────────────────────────────────────────
 
     async def async_load_stored_config(self) -> None:
-        """Load persisted zone config from HA storage. Call before MQTT starts."""
+        """Load persisted zone config. Checks entry.options first (no I/O needed),
+        then falls back to the HA Store for migration from older installs."""
+        # Primary path: entry.options is part of core.config_entries, already in
+        # memory when async_setup_entry is called — no disk read required.
+        zone_opts = self.entry.options.get("zone_configs", {})
+        if zone_opts:
+            self._load_zones_from_dict(zone_opts)
+            active = [z for z, c in self.zone_configs.items() if c.available_modes_mask != 0]
+            if active:
+                self._config_done = True
+                _LOGGER.info(
+                    "EasyTouch %s loaded config from entry options: zones=%s",
+                    self._serial, active,
+                )
+                return
+
+        # Fallback: HA Store (migration for data saved by older code).
+        # Store.async_load() can return None during early HA startup even when the
+        # file exists; entry.options is now the canonical location going forward.
         data = await self._store.async_load()
         _LOGGER.debug("EasyTouch %s store.async_load() returned: %r", self._serial, data)
         if not data:
-            _LOGGER.debug("EasyTouch %s no stored config found — will fetch from device", self._serial)
+            _LOGGER.debug(
+                "EasyTouch %s no stored config found — will fetch from device", self._serial
+            )
             return
-        for zone_str, cfg_data in data.get("zone_configs", {}).items():
+        self._load_zones_from_dict(data.get("zone_configs", {}))
+        active = [z for z, c in self.zone_configs.items() if c.available_modes_mask != 0]
+        if active:
+            self._config_done = True
+            _LOGGER.info(
+                "EasyTouch %s loaded config from store (migrating to entry options): zones=%s",
+                self._serial, active,
+            )
+            # Migrate to entry.options so future startups skip the Store read.
+            await self.async_save_stored_config()
+
+    def _load_zones_from_dict(self, zones: dict) -> None:
+        """Populate zone_configs from a serialised zone dict."""
+        for zone_str, cfg_data in zones.items():
             zone = int(zone_str)
             self.zone_configs[zone] = ZoneConfig(
                 zone=zone,
@@ -274,15 +307,9 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
                 min_heat_sp=cfg_data.get("min_heat_sp", DEFAULT_MIN_TEMP),
                 max_heat_sp=cfg_data.get("max_heat_sp", DEFAULT_MAX_TEMP),
             )
-        active = [z for z, c in self.zone_configs.items() if c.available_modes_mask != 0]
-        if active:
-            self._config_done = True
-            _LOGGER.info(
-                "EasyTouch %s loaded config from storage: zones=%s", self._serial, active
-            )
 
     async def async_save_stored_config(self) -> None:
-        """Persist current zone config to HA storage."""
+        """Persist current zone config to entry.options and the HA Store."""
         zones = {
             str(zone): {
                 "mav": cfg.available_modes_mask,
@@ -297,6 +324,11 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         }
         if not zones:
             return
+        # entry.options is written to core.config_entries — always loaded at startup.
+        self.hass.config_entries.async_update_entry(
+            self.entry,
+            options={**self.entry.options, "zone_configs": zones},
+        )
         await self._store.async_save({"zone_configs": zones})
 
     async def async_refresh_config(self) -> None:
@@ -306,6 +338,10 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         """
         self._config_done = False
         self.zone_configs.clear()
+        self.hass.config_entries.async_update_entry(
+            self.entry,
+            options={k: v for k, v in self.entry.options.items() if k != "zone_configs"},
+        )
         await self._store.async_save({})
         if self._connected:
             _LOGGER.info("EasyTouch %s requesting fresh Get Config", self._serial)
