@@ -107,19 +107,23 @@ HEAT_TYPE_PRESETS: dict[str, int] = {
 HEAT_TYPE_REVERSE: dict[int, str] = {v: k for k, v in HEAT_TYPE_PRESETS.items()}
 
 # ── Fan speed values (Z_sts indices 6-9, 11) ─────────────────────────────────
-# Device sends: 0=Auto, 1=Low, 2=Med, 3=High, 128=N/A (treated as Auto)
+# 0=Auto, 1=Manual Low, 2=Manual High, 65=Cycled Low, 66=Cycled High, 128=N/A (Auto)
 FAN_VALUE_TO_HA: dict[int, str] = {
     0: "auto",
     1: "low",
     2: "high",
-    3: "high",    # some units have 3-speed fans
-    128: "auto",  # N/A treated as auto
+    3: "high",          # 3-speed units: treat top speed as "high"
+    65: "Cycled Low",
+    66: "Cycled High",
+    128: "auto",        # N/A treated as auto
 }
 
 HA_FAN_TO_VALUE: dict[str, int] = {
     "auto": 128,
     "low": 1,
     "high": 2,
+    "Cycled Low": 65,
+    "Cycled High": 66,
 }
 
 # Fan field names in Change command (mode-dependent, same as BLE)

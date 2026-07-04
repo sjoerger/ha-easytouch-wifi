@@ -11,7 +11,6 @@ class ZoneConfig:
 
     zone: int
     available_modes_mask: int   # MAV bitmask: bit N set → device mode N is supported
-    fan_array: list[int]        # FA array, 16 entries (one per mode 0-15)
     min_cool_sp: int
     max_cool_sp: int
     min_heat_sp: int

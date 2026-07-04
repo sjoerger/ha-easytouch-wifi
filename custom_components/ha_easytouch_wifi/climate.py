@@ -136,7 +136,7 @@ class EasyTouchClimate(CoordinatorEntity[EasyTouchMQTTCoordinator], ClimateEntit
         self._attr_hvac_modes = [HVACMode.OFF]
         self._attr_hvac_mode = HVACMode.OFF
         self._attr_hvac_action = HVACAction.OFF
-        self._attr_fan_modes = ["auto", "low", "high"]
+        self._attr_fan_modes = ["auto", "low", "high", "Cycled Low", "Cycled High"]
         self._attr_fan_mode = "auto"
         self._attr_preset_modes: list[str] | None = None
         self._attr_preset_mode: str | None = None

@@ -12,7 +12,7 @@ This integration was built as a more reliable alternative to the existing BLE-ba
 - **Multi-zone support** — zones discovered dynamically; each gets its own climate entity
 - **Heat source presets** — select from Heat Pump, Furnace, Heat Strip, Electric Heat, Gas Heat (based on what your unit supports)
 - **Auto mode** — independent heating/cooling setpoints
-- **Fan control** — Auto, Low, Medium, High (mode-dependent)
+- **Fan control** — Auto, Low, High, Cycled Low, Cycled High (gas/furnace modes are always auto)
 - **Optimistic updates** — UI responds immediately; no waiting for the device to echo back state
 - **Firmware updates** — checks for available firmware daily via AWS and installs with one click; device downloads and reboots autonomously
 - **Temperature alerts** — configure low and high temperature alert thresholds (40–110°F) that trigger push notifications from the Micro-Air app

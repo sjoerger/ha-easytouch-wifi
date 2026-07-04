@@ -231,26 +231,10 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         ]
 
     def get_available_fan_modes(self, zone: int, mode_num: int) -> list[str]:
-        """Return HA fan modes available for a zone/mode combo (from FA array)."""
+        """Return HA fan modes available for a zone/mode combo."""
         if mode_num in GAS_MODES:
             return ["auto"]
-        cfg = self.zone_configs.get(zone)
-        if cfg is None or mode_num < 0 or mode_num >= len(cfg.fan_array):
-            return ["auto", "low", "high"]
-        bitmask = cfg.fan_array[mode_num]
-        if bitmask == 0:
-            return []
-        max_speed = bitmask & 0x0F
-        allow_manual_auto = bool(bitmask & 0x40)
-        allow_full_auto = bool(bitmask & 0x80)
-        modes: list[str] = []
-        if max_speed >= 2:
-            modes += ["low", "high"]
-        elif max_speed == 1:
-            modes.append("low")
-        if allow_full_auto or allow_manual_auto:
-            modes.append("auto")
-        return modes or ["auto"]
+        return ["auto", "low", "high", "Cycled Low", "Cycled High"]
 
     # ──────────────────────────────────────────────────────────────────────────
     # Config persistence
@@ -301,7 +285,6 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
             self.zone_configs[zone] = ZoneConfig(
                 zone=zone,
                 available_modes_mask=cfg_data.get("mav", 0),
-                fan_array=cfg_data.get("fa", [0] * 16),
                 min_cool_sp=cfg_data.get("min_cool_sp", DEFAULT_MIN_TEMP),
                 max_cool_sp=cfg_data.get("max_cool_sp", DEFAULT_MAX_TEMP),
                 min_heat_sp=cfg_data.get("min_heat_sp", DEFAULT_MIN_TEMP),
@@ -313,7 +296,6 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         zones = {
             str(zone): {
                 "mav": cfg.available_modes_mask,
-                "fa": cfg.fan_array,
                 "min_cool_sp": cfg.min_cool_sp,
                 "max_cool_sp": cfg.max_cool_sp,
                 "min_heat_sp": cfg.min_heat_sp,
@@ -769,9 +751,6 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
     def _store_zone_config(self, cfg: dict) -> None:
         zone = int(cfg.get("Zone", 0))
         mav = int(cfg.get("MAV", 0))
-        fa_raw = cfg.get("FA", [])
-        fa = list(fa_raw[:16]) + [0] * max(0, 16 - len(fa_raw))
-
         spl = cfg.get("SPL", [])
         min_cool = spl[0] if len(spl) > 0 else DEFAULT_MIN_TEMP
         max_cool = spl[1] if len(spl) > 1 else DEFAULT_MAX_TEMP
@@ -781,7 +760,6 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
         self.zone_configs[zone] = ZoneConfig(
             zone=zone,
             available_modes_mask=mav,
-            fan_array=fa,
             min_cool_sp=min_cool,
             max_cool_sp=max_cool,
             min_heat_sp=min_heat,
@@ -871,7 +849,6 @@ class EasyTouchMQTTCoordinator(DataUpdateCoordinator[ThermostatState | None]):
                             self.zone_configs[zone_num] = ZoneConfig(
                                 zone=zone_num,
                                 available_modes_mask=mav,
-                                fan_array=[0] * 16,
                                 min_cool_sp=DEFAULT_MIN_TEMP,
                                 max_cool_sp=DEFAULT_MAX_TEMP,
                                 min_heat_sp=DEFAULT_MIN_TEMP,

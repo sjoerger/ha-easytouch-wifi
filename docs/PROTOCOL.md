@@ -154,10 +154,12 @@ The `Z_sts` object has one key per zone (e.g. `"0"`, `"1"`). Each zone is a 16-e
 | Value | Meaning |
 |---|---|
 | 0 | Auto |
-| 1 | Low |
-| 2 | Medium |
-| 3 | High |
-| 128 | Not applicable |
+| 1 | Manual Low (continuous) |
+| 2 | Manual High (continuous) |
+| 3 | Manual High — 3-speed units only |
+| 65 | Cycled Low (fan runs only during active cycle) |
+| 66 | Cycled High (fan runs only during active cycle) |
+| 128 | N/A (treated as Auto) |
 
 **Fault codes (`Z_sts[14]`):**
 
